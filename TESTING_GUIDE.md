@@ -4,7 +4,7 @@
 
 ### 1. Test Webhook Status
 ```bash
-curl https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test
+curl https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test
 ```
 
 **Expected Response:**
@@ -25,7 +25,7 @@ curl https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webh
 
 ### 2. Test Data Processing
 ```bash
-curl -X POST https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data \
+curl -X POST https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data \
   -H "Content-Type: application/json" \
   -d '{
     "typeWebhook": "incomingMessageReceived",
@@ -94,7 +94,7 @@ GEMINI_API_KEY=AIzaSyC51gSO_1tZaXEfHZDUuU3Z0DuAkssiM3k
 ### 1. Configure GreenAPI Webhook
 In your GreenAPI dashboard, set the webhook URL to:
 ```
-https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook
+https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook
 ```
 
 ### 2. Test the WhatsApp Link

@@ -28,9 +28,9 @@ echo 🔍 Check deployment status at:
 echo    https://dashboard.render.com
 echo.
 echo 🌐 Once deployed, test these URLs:
-echo    https://tmis-business-guru-backend.onrender.com/
-echo    https://tmis-business-guru-backend.onrender.com/api/health
-echo    https://tmis-business-guru-backend.onrender.com/api/test
+echo    https://business-guru-backend.onrender.com/
+echo    https://business-guru-backend.onrender.com/api/health
+echo    https://business-guru-backend.onrender.com/api/test
 echo.
 echo 📱 Frontend should now work with mock data!
 echo.

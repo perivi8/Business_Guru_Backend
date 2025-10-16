@@ -8,11 +8,11 @@ import json
 
 def test_cors_preflight():
     """Test CORS preflight request"""
-    url = "https://tmis-business-guru-backend.onrender.com/api/enquiries"
+    url = "https://business-guru-backend.onrender.com/api/enquiries"
     
     # Test OPTIONS request (preflight)
     headers = {
-        'Origin': 'https://tmis-business-guru.vercel.app',
+        'Origin': 'https://business-guru-vert.vercel.app',
         'Access-Control-Request-Method': 'GET',
         'Access-Control-Request-Headers': 'Authorization, Content-Type'
     }
@@ -44,10 +44,10 @@ def test_cors_preflight():
 
 def test_actual_request():
     """Test actual GET request with CORS headers"""
-    url = "https://tmis-business-guru-backend.onrender.com/api/enquiries"
+    url = "https://business-guru-backend.onrender.com/api/enquiries"
     
     headers = {
-        'Origin': 'https://tmis-business-guru.vercel.app',
+        'Origin': 'https://business-guru-vert.vercel.app',
         'Authorization': 'Bearer test-token',  # This will fail auth but should pass CORS
         'Content-Type': 'application/json'
     }
@@ -82,7 +82,7 @@ def test_actual_request():
 
 def test_health_endpoint():
     """Test if the backend is running"""
-    url = "https://tmis-business-guru-backend.onrender.com/api/health"
+    url = "https://business-guru-backend.onrender.com/api/health"
     
     print("🧪 Testing backend health...")
     

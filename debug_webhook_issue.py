@@ -17,8 +17,8 @@ def test_webhook_endpoint_accessibility():
     """Test if the webhook endpoint is accessible"""
     print("🔄 Testing webhook endpoint accessibility...")
     
-    webhook_url = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
-    test_url = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test"
+    webhook_url = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
+    test_url = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test"
     
     try:
         # Test the test endpoint first
@@ -90,7 +90,7 @@ def check_greenapi_webhook_config():
             print(f"📋 Webhook URL: {webhook_url}")
             print(f"📋 Webhook URL Token: {webhook_url_token}")
             
-            expected_webhook = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
+            expected_webhook = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
             if webhook_url == expected_webhook:
                 print("✅ Webhook URL is correctly configured")
                 return True
@@ -198,7 +198,7 @@ def provide_testing_recommendations():
     
     print("\n4. 🧪 ALTERNATIVE TESTING")
     print("   Use the test endpoint to simulate webhook data:")
-    print("   POST https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data")
+    print("   POST https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data")
     
     print("\n5. ✅ SUCCESS INDICATORS")
     print("   - Render logs show: '📥 === NEW WEBHOOK REQUEST ==='")

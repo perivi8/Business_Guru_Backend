@@ -27,7 +27,7 @@ real_user_data = {
 # Send POST request to the production webhook endpoint
 try:
     response = requests.post(
-        "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook",
+        "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook",
         json=real_user_data,
         headers={"Content-Type": "application/json"},
         timeout=30

@@ -72,7 +72,7 @@ The enquiry records now include these additional fields:
 ## Testing
 
 ### Webhook URL
-The webhook is configured at: `https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook`
+The webhook is configured at: `https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook`
 
 ### Test Data Format
 GreenAPI sends data in this format:

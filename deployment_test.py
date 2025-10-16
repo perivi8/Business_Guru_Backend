@@ -113,7 +113,7 @@ def test_app_creation():
         app = Flask(__name__)
         app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'test-key')
         
-        CORS(app, origins=["https://tmis-business-guru.vercel.app"], supports_credentials=True)
+        CORS(app, origins=["https://business-guru-vert.vercel.app"], supports_credentials=True)
         jwt = JWTManager(app)
         
         print("✅ Flask app created successfully")
@@ -126,7 +126,7 @@ def test_backend_deployment():
     """Test the deployed backend endpoints"""
     print("\n🔍 Testing Backend Deployment...")
     
-    base_url = "https://tmis-business-guru-backend.onrender.com"
+    base_url = "https://business-guru-backend.onrender.com"
     
     try:
         import requests
@@ -153,7 +153,7 @@ def test_backend_deployment():
         # Test 3: CORS preflight test
         try:
             headers = {
-                'Origin': 'https://tmis-business-guru.vercel.app',
+                'Origin': 'https://business-guru-vert.vercel.app',
                 'Access-Control-Request-Method': 'GET',
                 'Access-Control-Request-Headers': 'Authorization,Content-Type'
             }

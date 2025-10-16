@@ -134,7 +134,7 @@ def test_production_webhook():
     }
     
     # Production URL
-    prod_url = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
+    prod_url = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
     
     try:
         response = requests.post(

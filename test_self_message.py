@@ -35,7 +35,7 @@ def test_webhook_processing():
     """Test how the webhook processes this data"""
     print("🧪 Testing outgoing message webhook processing...")
     
-    url = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
+    url = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
     
     try:
         response = requests.post(

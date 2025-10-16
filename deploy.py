@@ -84,12 +84,12 @@ def show_deployment_steps():
     print("   https://dashboard.render.com/")
     
     print("\n4. Test endpoints after deployment:")
-    print("   https://tmis-business-guru-backend.onrender.com/")
-    print("   https://tmis-business-guru-backend.onrender.com/api/health")
-    print("   https://tmis-business-guru-backend.onrender.com/api/debug/database")
+    print("   https://business-guru-backend.onrender.com/")
+    print("   https://business-guru-backend.onrender.com/api/health")
+    print("   https://business-guru-backend.onrender.com/api/debug/database")
     
     print("\n5. Test client endpoint (requires JWT token):")
-    print("   https://tmis-business-guru-backend.onrender.com/api/clients")
+    print("   https://business-guru-backend.onrender.com/api/clients")
 
 def main():
     """Main deployment preparation function"""

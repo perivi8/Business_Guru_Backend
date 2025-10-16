@@ -57,7 +57,7 @@ def test_greenapi_settings():
             print(f"📋 Outgoing messages: {settings.get('outgoingWebhook', 'Not set')}")
             
             # Check if webhook is properly configured
-            expected_url = "https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
+            expected_url = "https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook"
             if settings.get('webhookUrl') == expected_url:
                 print("✅ Webhook URL is correctly configured")
             else:

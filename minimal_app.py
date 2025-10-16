@@ -25,7 +25,7 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 CORS(app, origins=[
     "http://localhost:4200",
     "http://localhost:4201", 
-    "https://tmis-business-guru.vercel.app"
+    "https://business-guru-vert.vercel.app"
 ], supports_credentials=True,
 allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
 methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])

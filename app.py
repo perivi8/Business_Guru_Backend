@@ -45,9 +45,9 @@ cors = CORS()
 allowed_origins = [
     "http://localhost:4200", 
     "http://localhost:4201", 
-    "https://tmis-business-guru.vercel.app",
-    "https://tmis-business-guru-frontend.vercel.app",
-    "https://tmis-business-guru-backend.onrender.com"
+    "https://business-guru-vert.vercel.app",
+    "https://business-guru-vert.vercel.app",
+    "https://business-guru-backend.onrender.com"
 ]
 
 # Add any additional origins from environment variable
@@ -60,20 +60,20 @@ flask_env = os.getenv('FLASK_ENV', 'development')
 if flask_env == 'production':
     # Add all possible Vercel domain patterns based on your project
     vercel_domains = [
-        "https://tmis-business-guru-git-main-perivihks-projects.vercel.app",
-        "https://tmis-business-guru-perivihks-projects.vercel.app",
-        "https://tmis-business-guru-git-main.vercel.app",
-        "https://tmis-business-guru-frontend.vercel.app",
-        "https://tmis-business-guru-frontend-git-main.vercel.app",
-        "https://tmis-business-guru-frontend-perivihks-projects.vercel.app",
+        "https://business-guru-vert-git-main-perivihks-projects.vercel.app",
+        "https://business-guru-vert-perivihks-projects.vercel.app",
+        "https://business-guru-vert-git-main.vercel.app",
+        "https://business-guru-vert.vercel.app",
+        "https://business-guru-vert-git-main.vercel.app",
+        "https://business-guru-vert-perivihks-projects.vercel.app",
         # Add common Vercel patterns for your username
-        "https://tmis-business-guru-perivihk.vercel.app",
-        "https://tmis-business-guru-git-main-perivihk.vercel.app",
+        "https://business-guru-vert-perivihk.vercel.app",
+        "https://business-guru-vert-git-main-perivihk.vercel.app",
         # Add more comprehensive patterns for Angular deployment
-        "https://tmis-business-guru-frontend-git-main-perivihks-projects.vercel.app",
-        "https://tmis-business-guru-angular.vercel.app",
-        "https://tmis-business-guru-angular-git-main.vercel.app",
-        "https://tmis-business-guru-angular-perivihks-projects.vercel.app",
+        "https://business-guru-vert-git-main-perivihks-projects.vercel.app",
+        "https://business-guru-vert-angular.vercel.app",
+        "https://business-guru-vert-angular-git-main.vercel.app",
+        "https://business-guru-vert-angular-perivihks-projects.vercel.app",
         # Add wildcard pattern to catch all Vercel deployments
         "https://*.vercel.app"
     ]
@@ -1179,7 +1179,7 @@ def approve_user(user_id):
                 <p>Dear {pending_registration['username']},</p>
                 <p>Your account registration has been approved by {admin_name}.</p>
                 <p>You can now log in to your account using your email and password.</p>
-                <p><strong>Login URL:</strong> <a href="https://tmis-business-guru.vercel.app/login">Login Here</a></p>
+                <p><strong>Login URL:</strong> <a href="https://business-guru-vert.vercel.app/login">Login Here</a></p>
                 <p>Thank you for joining TMIS Business Guru!</p>
             </body>
             </html>

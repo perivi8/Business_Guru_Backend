@@ -7,7 +7,7 @@ import requests
 import json
 from datetime import datetime
 
-BASE_URL = "https://tmis-business-guru-backend.onrender.com"
+BASE_URL = "https://business-guru-backend.onrender.com"
 
 def test_endpoint(url, method="GET", data=None, headers=None, description=""):
     """Test a single endpoint"""
@@ -121,7 +121,7 @@ def main():
         print("⚠️  Some tests failed. Backend may still be starting up.")
         print("   Wait 1-2 minutes and run this test again.")
     
-    print(f"\n🌐 Frontend URL: https://tmis-business-guru.vercel.app")
+    print(f"\n🌐 Frontend URL: https://business-guru-vert.vercel.app")
     print(f"🔧 Backend URL: {BASE_URL}")
 
 if __name__ == "__main__":

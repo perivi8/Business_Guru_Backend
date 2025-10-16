@@ -27,14 +27,14 @@ This will create a test enquiry directly in your database.
 ### **3. Webhook Logic Test**
 Test the webhook processing logic:
 ```bash
-curl -X POST https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data
+curl -X POST https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test-data
 ```
 
 ## **🔍 How to Verify Everything Works**
 
 ### **Step 1: Check Webhook Status**
 ```bash
-curl https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test
+curl https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook/test
 ```
 **Expected**: Status "success" with version "2.1"
 
@@ -70,7 +70,7 @@ When someone with a **different number** clicks your link and sends "Hi I am int
 
 1. **Check GreenAPI Webhook URL**:
    - Login to GreenAPI dashboard
-   - Verify webhook URL: `https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook`
+   - Verify webhook URL: `https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook`
 
 2. **Check Render Logs**:
    - Look for: `📥 === NEW WEBHOOK REQUEST ===`

@@ -9,7 +9,7 @@ import time
 
 def test_render_deployment():
     """Test if the Render deployment is working correctly"""
-    base_url = "https://tmis-business-guru-backend.onrender.com"
+    base_url = "https://business-guru-backend.onrender.com"
     
     print(f"=== Testing Render Deployment ===")
     print(f"Base URL: {base_url}")

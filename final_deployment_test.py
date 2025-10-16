@@ -60,7 +60,7 @@ def test_render_webhook():
     """Test webhook functionality on Render"""
     print("\n=== Testing Render Webhook ===")
     
-    base_url = "https://tmis-business-guru-backend.onrender.com"
+    base_url = "https://business-guru-backend.onrender.com"
     
     # Test data simulating an incoming WhatsApp message from GreenAPI
     webhook_data = {
@@ -136,7 +136,7 @@ def main():
         print("   1. Go to https://console.green-api.com")
         print("   2. Select your instance (Instance ID: 7105335459)")
         print("   3. Navigate to Settings > Webhooks")
-        print("   4. Set Webhook URL to: https://tmis-business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook")
+        print("   4. Set Webhook URL to: https://business-guru-backend.onrender.com/api/enquiries/whatsapp/webhook")
         print("   5. Enable 'Incoming Message' webhook")
     else:
         print("\n❌ Some tests failed. Please check the implementation.")

@@ -35,7 +35,7 @@ def verify_welcome_message():
         "✅ 1% monthly interest (Lowest in market!)",
         "✅ Zero collateral or CIBIL checks",
         "✅ New startups welcome",
-        "Apply Now: https://tmis-business-guru.vercel.app/new-enquiry",
+        "Apply Now: https://business-guru-vert.vercel.app/new-enquiry",
         "✨ Special Benefits:",
         "0% processing fees (First 50 applicants)",
         "Flexible repayment: 1-5 years",

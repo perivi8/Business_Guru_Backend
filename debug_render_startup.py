@@ -76,7 +76,7 @@ def test_local_startup():
 def compare_with_render():
     """Compare local behavior with Render behavior"""
     print("\n=== Comparing with Render ===")
-    base_url = "https://tmis-business-guru-backend.onrender.com"
+    base_url = "https://business-guru-backend.onrender.com"
     
     try:
         # Test routes endpoint on Render

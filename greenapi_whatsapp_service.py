@@ -295,7 +295,7 @@ Get ₹10 Lakhs in 24 hours for your business:
 
 ✅ New startups welcome
 
-Apply Now: https://tmis-business-guru.vercel.app/new-enquiry
+Apply Now: https://business-guru-vert.vercel.app/new-enquiry
 
 ✨ Special Benefits:
 
@@ -306,7 +306,7 @@ Apply Now: https://tmis-business-guru.vercel.app/new-enquiry
 🏆 Trusted by 2,500+ businesses
 
 📱 Ready to grow?
-Apply Now: https://tmis-business-guru.vercel.app/new-enquiry
+Apply Now: https://business-guru-vert.vercel.app/new-enquiry
 
 Your success journey begins now! 🚀
 
