@@ -1094,14 +1094,18 @@ def update_client(client_id):
         elif comments is not None:
             update_type = "comment added"
         
-        # Send email notifications for ALL updates (status, feedback, comments)
-        # This ensures emails are sent for mark interested, not interested, hold, etc.
-        if status is not None or feedback is not None or comments is not None:
+        # Send email notifications for status and feedback updates, but NOT for comment-only updates
+        # This ensures emails are sent for mark interested, not interested, hold, etc., but not for comments
+        is_comment_only_update = (status is None and feedback is None and comments is not None)
+        
+        if (status is not None or feedback is not None) and not is_comment_only_update:
             print(f"📧 Triggering email notification for: {update_type}")
             import threading
             notification_thread = threading.Thread(target=send_notifications)
             notification_thread.daemon = True  # Daemon thread will not prevent app from exiting
             notification_thread.start()
+        elif is_comment_only_update:
+            print("ℹ️ Comment-only update detected - skipping email notification")
         else:
             print("ℹ️ No significant updates detected - skipping email notification")
         
