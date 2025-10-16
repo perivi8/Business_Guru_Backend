@@ -17,6 +17,15 @@ import threading
 import time
 from bson.json_util import dumps
 
+# Import email service
+try:
+    from email_service import EmailService
+    EMAIL_SERVICE_AVAILABLE = True
+    print("✅ Email service imported successfully")
+except ImportError as e:
+    print(f"⚠️ Email service not available: {e}")
+    EMAIL_SERVICE_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -92,11 +101,13 @@ cors.init_app(app,
     expose_headers=[
         "Content-Disposition",
         "Authorization",
-        "Access-Control-Allow-Origin"
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
     ],
     send_wildcard=False,  # Cannot use wildcard with credentials
     automatic_options=True,
-    max_age=86400  # Cache preflight for 24 hours
+    max_age=3600  # Cache preflight for 1 hour (reduced for better debugging)
 )
 jwt = JWTManager(app)
 
@@ -425,8 +436,17 @@ except Exception as e:
     users_collection = None
     clients_collection = None
 
-# Collections are already initialized in the try/except block above
-# This section is kept for compatibility but collections are already set
+# Initialize email service
+email_service = None
+if EMAIL_SERVICE_AVAILABLE:
+    try:
+        email_service = EmailService()
+        print("✅ Email service initialized successfully")
+    except Exception as e:
+        print(f"❌ Email service initialization failed: {e}")
+        email_service = None
+else:
+    print("⚠️ Email service not available - using fallback SMTP")
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx'}
@@ -435,20 +455,61 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def send_email(to_email, subject, body):
-    """Send email notification"""
+    """Send email notification using EmailService with Brevo support"""
     try:
+        print(f"📧 Attempting to send email to: {to_email}")
+        print(f"📧 Subject: {subject}")
+        
+        # Use EmailService if available (includes Brevo support)
+        if email_service:
+            print("🚀 Using EmailService with Brevo support")
+            try:
+                # Create a simple email data structure
+                email_data = {
+                    'to_email': to_email,
+                    'subject': subject,
+                    'body': body
+                }
+                
+                # Use the send_password_reset_email method if available, otherwise use generic method
+                if hasattr(email_service, 'send_password_reset_email'):
+                    result = email_service.send_password_reset_email(to_email, subject, body)
+                else:
+                    # Fallback to a generic send method if available
+                    result = email_service.send_client_update_notification(
+                        {'legal_name': 'Password Reset'}, 
+                        'System', 
+                        [{'email': to_email}], 
+                        'password_reset'
+                    )
+                
+                if result:
+                    print(f"✅ Email sent successfully via EmailService to {to_email}")
+                    return True
+                else:
+                    print(f"❌ EmailService failed, trying fallback SMTP")
+                    
+            except Exception as service_error:
+                print(f"❌ EmailService error: {service_error}")
+                print("🔄 Falling back to direct SMTP")
+        
+        # Fallback to direct SMTP
+        print("📧 Using fallback SMTP method")
         smtp_server = os.getenv('SMTP_SERVER')
         smtp_port = os.getenv('SMTP_PORT')
         smtp_email = os.getenv('SMTP_EMAIL')
         smtp_password = os.getenv('SMTP_PASSWORD')
         
-        print(f"📧 Attempting to send email to: {to_email}")
         print(f"📧 SMTP Server: {smtp_server}:{smtp_port}")
         print(f"📧 From Email: {smtp_email}")
         
         # Check if all required SMTP configuration is available
         if not all([smtp_server, smtp_port, smtp_email, smtp_password]):
             print("❌ Missing SMTP configuration")
+            print(f"   SMTP_SERVER: {'Set' if smtp_server else 'Missing'}")
+            print(f"   SMTP_PORT: {'Set' if smtp_port else 'Missing'}")
+            print(f"   SMTP_EMAIL: {'Set' if smtp_email else 'Missing'}")
+            print(f"   SMTP_PASSWORD: {'Set' if smtp_password else 'Missing'}")
             return False
         
         # Convert port to integer
@@ -477,7 +538,7 @@ def send_email(to_email, subject, body):
         server.sendmail(smtp_email, to_email, text)
         server.quit()
         
-        print(f"✅ Email sent successfully to {to_email}")
+        print(f"✅ Email sent successfully via SMTP to {to_email}")
         return True
         
     except smtplib.SMTPAuthenticationError as e:
@@ -1588,11 +1649,16 @@ def forgot_password():
             """
             
             print(f"Sending reset code {reset_code} to {email}")
-            email_sent = send_email(email, subject, body)
+            
+            # Use EmailService with reset code if available
+            if email_service and hasattr(email_service, 'send_password_reset_email'):
+                email_sent = email_service.send_password_reset_email(email, subject, body, reset_code)
+            else:
+                email_sent = send_email(email, subject, body)
             
             if not email_sent:
                 print(f"Email sending failed for {email}")
-                return jsonify({'error': 'Failed to send reset code. Please check your email address.'}), 500
+                return jsonify({'error': 'Failed to send reset code. Please try again or contact support.'}), 500
                 
             print(f"✅ Email sent successfully to {email}")
             

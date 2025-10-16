@@ -1296,6 +1296,129 @@ class EmailService:
         """
         
         return html_template
+    
+    def send_password_reset_email(self, to_email, subject, body, reset_code=None):
+        """
+        Send password reset email with reset code
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            body: Email body (can be HTML)
+            reset_code: Optional reset code to include
+        
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            print(f"🔐 Sending password reset email to: {to_email}")
+            
+            # Extract reset code from body if not provided separately
+            if not reset_code and 'style="color: #007bff' in body:
+                import re
+                code_match = re.search(r'(\d{6})', body)
+                if code_match:
+                    reset_code = code_match.group(1)
+            
+            # Create enhanced HTML template for password reset
+            html_body = self._create_password_reset_template(to_email, reset_code, body)
+            
+            # Try Brevo API first if available
+            if self.brevo_service and self.brevo_from_email:
+                print("🚀 Using Brevo API for password reset email")
+                try:
+                    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                        to=[{"email": to_email}],
+                        sender={"name": self.brevo_from_name, "email": self.brevo_from_email},
+                        subject=subject,
+                        html_content=html_body
+                    )
+                    
+                    api_response = self.brevo_service.send_transac_email(send_smtp_email)
+                    print(f"✅ Brevo API password reset email sent successfully")
+                    print(f"   Message ID: {api_response.message_id}")
+                    return True
+                    
+                except ApiException as e:
+                    print(f"❌ Brevo API error: {e}")
+                    print("🔄 Falling back to SMTP")
+                except Exception as e:
+                    print(f"❌ Brevo API unexpected error: {e}")
+                    print("🔄 Falling back to SMTP")
+            
+            # Fallback to SMTP
+            print("📧 Using SMTP for password reset email")
+            return self._send_smtp_email(to_email, subject, html_body)
+            
+        except Exception as e:
+            print(f"❌ Password reset email failed: {str(e)}")
+            return False
+    
+    def _create_password_reset_template(self, to_email, reset_code, original_body):
+        """Create enhanced HTML template for password reset email"""
+        
+        # Extract username from email (part before @)
+        username = to_email.split('@')[0].title()
+        
+        html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                .header {{ background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px; }}
+                .header h1 {{ margin: 0; font-size: 24px; }}
+                .content {{ line-height: 1.6; color: #333; }}
+                .reset-code {{ background-color: #f8f9fa; border: 2px solid #007bff; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; }}
+                .reset-code h3 {{ margin: 0 0 10px 0; color: #007bff; font-size: 24px; letter-spacing: 3px; }}
+                .expiry-notice {{ background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0; }}
+                .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px; }}
+                .security-notice {{ background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px; margin: 20px 0; color: #721c24; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Password Reset Request</h1>
+                </div>
+                
+                <div class="content">
+                    <p>Dear <strong>{username}</strong>,</p>
+                    
+                    <p>You have requested to reset your password for your TMIS Business Guru account.</p>
+                    
+                    <div class="reset-code">
+                        <p><strong>Your Password Reset Code:</strong></p>
+                        <h3>{reset_code or 'CODE_NOT_FOUND'}</h3>
+                    </div>
+                    
+                    <div class="expiry-notice">
+                        <p><strong>⏰ Important:</strong> This code will expire in <strong>15 minutes</strong> for security reasons.</p>
+                    </div>
+                    
+                    <p>Please enter this code in the password reset form to continue with resetting your password.</p>
+                    
+                    <div class="security-notice">
+                        <p><strong>🛡️ Security Notice:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.</p>
+                    </div>
+                    
+                    <p>Best regards,<br>
+                    <strong>TMIS Business Guru Team</strong></p>
+                </div>
+                
+                <div class="footer">
+                    <p>This is an automated security notification from TMIS Business Guru system.</p>
+                    <p>&copy; 2024 TMIS Business Guru. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html_template
 
 # Create global email service instance
 email_service = EmailService()
