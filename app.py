@@ -74,8 +74,8 @@ if flask_env == 'production':
         "https://business-guru-vert-angular.vercel.app",
         "https://business-guru-vert-angular-git-main.vercel.app",
         "https://business-guru-vert-angular-perivihks-projects.vercel.app",
-        # Add wildcard pattern to catch all Vercel deployments
-        "https://*.vercel.app"
+        # Add more specific Vercel patterns instead of wildcard
+        "https://business-guru-vert-git-main-perivihks-projects.vercel.app"
     ]
     allowed_origins.extend(vercel_domains)
     print(f"🔧 Production mode: Added Vercel domains to CORS")
@@ -205,6 +205,16 @@ def comprehensive_status():
 @app.route('/api/cors-debug', methods=['GET', 'POST', 'OPTIONS'])
 def cors_debug():
     """Debug endpoint to check CORS configuration"""
+    # Handle OPTIONS request explicitly
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'CORS preflight OK'})
+        origin = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
     origin = request.headers.get('Origin', 'No Origin Header')
     content_type = request.headers.get('Content-Type', 'No Content-Type Header')
     
@@ -281,20 +291,36 @@ def handle_requests():
         else:
             print("No Bearer token found in Authorization header")
 
-# Simplified after_request handler for dynamic Vercel origins only
+# Enhanced after_request handler for dynamic Vercel origins and CORS debugging
 @app.after_request
 def after_request_cors_handler(response):
-    """Handle dynamic CORS for new Vercel deployments only"""
+    """Handle dynamic CORS for new Vercel deployments and ensure proper headers"""
     try:
         origin = request.headers.get('Origin')
         
-        # Only handle new Vercel origins that aren't in the static allowed_origins list
-        if (flask_env == 'production' and origin and 'vercel.app' in origin and 
-            origin not in allowed_origins):
-            # Check if Flask-CORS already set the origin
-            if not response.headers.get('Access-Control-Allow-Origin'):
-                response.headers['Access-Control-Allow-Origin'] = origin
-                print(f"🔧 Added dynamic CORS origin: {origin}")
+        # Debug CORS issues
+        if origin and 'vercel.app' in origin:
+            print(f"🔍 CORS Debug - Origin: {origin}")
+            print(f"🔍 CORS Debug - Path: {request.path}")
+            print(f"🔍 CORS Debug - Method: {request.method}")
+            print(f"🔍 CORS Debug - Current CORS header: {response.headers.get('Access-Control-Allow-Origin')}")
+        
+        # Handle dynamic Vercel origins
+        if (origin and 'vercel.app' in origin):
+            # Always allow Vercel origins for public endpoints like forgot-password
+            if request.path in ['/api/forgot-password', '/api/health', '/api/cors-debug']:
+                if not response.headers.get('Access-Control-Allow-Origin'):
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+                    print(f"🔧 Added dynamic CORS for public endpoint: {origin}")
+            # For other endpoints, only if not in static list
+            elif origin not in allowed_origins:
+                if not response.headers.get('Access-Control-Allow-Origin'):
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                    print(f"🔧 Added dynamic CORS origin: {origin}")
             
         return response
     except Exception as e:
@@ -1479,9 +1505,18 @@ def resume_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 # Forgot password endpoints
-@app.route('/api/forgot-password', methods=['POST'])
+@app.route('/api/forgot-password', methods=['POST', 'OPTIONS'])
 def forgot_password():
     """Send password reset code to user's email"""
+    # Handle OPTIONS request for CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'OK'})
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
     try:
         data = request.get_json()
         email = data.get('email')
