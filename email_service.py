@@ -155,7 +155,7 @@ class EmailService:
                     print("❌ Brevo SMTP failed, trying Brevo API fallback...")
             
             # Priority 2: Use Brevo API service as fallback
-            elif hasattr(self, 'brevo_service') and self.brevo_service:
+            if hasattr(self, 'brevo_service') and self.brevo_service:
                 print(f"🎆 USING: Brevo API Service (Priority 2 - Fallback)")
                 brevo_success = self._send_via_brevo(client_data, admin_name, tmis_users, update_type, loan_status)
                 if brevo_success:
@@ -597,9 +597,17 @@ class EmailService:
                     else:
                         print(f"   ❌ Network connectivity to {self.smtp_server}:{self.smtp_port} - FAILED (Error code: {result})")
                         print(f"   💡 This suggests a firewall or network routing issue")
+                        # If this is Brevo SMTP in production, try Brevo API as fallback
+                        if self.is_production and self.smtp_server == 'smtp-relay.brevo.com' and hasattr(self, 'brevo_service') and self.brevo_service:
+                            print(f"   💡 Will attempt to use Brevo API as fallback")
+                            return False  # Return False to trigger fallback
                 except Exception as net_error:
                     print(f"   ⚠️ Network test failed: {str(net_error)}")
                     print(f"   💡 Network connectivity test error - this may indicate DNS or routing issues")
+                    # If this is Brevo SMTP in production, try Brevo API as fallback
+                    if self.is_production and self.smtp_server == 'smtp-relay.brevo.com' and hasattr(self, 'brevo_service') and self.brevo_service:
+                        print(f"   💡 Will attempt to use Brevo API as fallback")
+                        return False  # Return False to trigger fallback
             
             # Helper function for timeout-wrapped SMTP operations
             def smtp_with_timeout(func, timeout_seconds=30):
@@ -779,9 +787,50 @@ class EmailService:
             # Validate SMTP configuration
             if not self.smtp_email or not self.smtp_password:
                 print("❌ SMTP email or password not configured")
+                # Try Brevo API as fallback if available
+                if hasattr(self, 'brevo_service') and self.brevo_service:
+                    print("💡 Trying Brevo API as fallback...")
+                    return self._send_via_brevo(client_data, admin_name, tmis_users, update_type, loan_status)
                 return False
             
             print(f"📧 SMTP: From {self.smtp_email} via {self.smtp_server}:{self.smtp_port}")
+            
+            # Check if we're in production and using Brevo SMTP but having connectivity issues
+            if self.is_production and self.smtp_server == 'smtp-relay.brevo.com':
+                print("🔍 Detected Brevo SMTP in production environment")
+                # Test connectivity before proceeding
+                try:
+                    import socket
+                    print(f"🔍 Testing network connectivity to {self.smtp_server}:{self.smtp_port}...")
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(10)
+                    result = sock.connect_ex((self.smtp_server, int(self.smtp_port)))
+                    sock.close()
+                    if result != 0:
+                        print(f"❌ Network connectivity to {self.smtp_server}:{self.smtp_port} - FAILED (Error code: {result})")
+                        print("💡 This suggests a firewall or network routing issue")
+                        print("💡 Will attempt to use Brevo API as fallback...")
+                        # Try Brevo API as fallback
+                        if hasattr(self, 'brevo_service') and self.brevo_service:
+                            return self._send_via_brevo(client_data, admin_name, tmis_users, update_type, loan_status)
+                        else:
+                            print("❌ Brevo API service not available as fallback")
+                            return False
+                    else:
+                        print(f"✅ Network connectivity to {self.smtp_server}:{self.smtp_port} - OK")
+                except Exception as net_error:
+                    print(f"⚠️ Network test failed: {str(net_error)}")
+                    # Try Brevo API as fallback
+                    if hasattr(self, 'brevo_service') and self.brevo_service:
+                        print("💡 Attempting to use Brevo API as fallback...")
+                        return self._send_via_brevo(client_data, admin_name, tmis_users, update_type, loan_status)
+                    else:
+                        print("❌ Brevo API service not available as fallback")
+                        return False
+            
+            # If connectivity test passed, proceed with normal SMTP sending
+            # Return False to let the main method handle the fallback
+            return False
             
             # Prepare recipients - Client emails + TMIS staff assigned to this client
             tmis_recipients = []
@@ -876,7 +925,19 @@ class EmailService:
                     print(f"✅ TMIS email sent via SMTP to {len(tmis_recipients)} assigned staff")
                 else:
                     print("❌ Failed to send TMIS email via SMTP")
-                    success = False
+                    # If this was due to network issues with Brevo SMTP, try Brevo API as fallback
+                    if (self.is_production and self.smtp_server == 'smtp-relay.brevo.com' and 
+                        hasattr(self, 'brevo_service') and self.brevo_service):
+                        print("💡 Attempting to send TMIS email via Brevo API as fallback...")
+                        brevo_success = self._send_brevo_email(tmis_recipients, subject, html_body)
+                        if brevo_success:
+                            print(f"✅ TMIS email sent via Brevo API to {len(tmis_recipients)} assigned staff")
+                            tmis_success = True  # Mark as successful
+                        else:
+                            print("❌ Failed to send TMIS email via Brevo API fallback")
+                            success = False
+                    else:
+                        success = False
             
             # Send to client
             if client_recipients:
@@ -893,7 +954,19 @@ class EmailService:
                     print(f"✅ Client email sent via SMTP to {len(client_recipients)} recipients")
                 else:
                     print("❌ Failed to send client email via SMTP")
-                    success = False
+                    # If this was due to network issues with Brevo SMTP, try Brevo API as fallback
+                    if (self.is_production and self.smtp_server == 'smtp-relay.brevo.com' and 
+                        hasattr(self, 'brevo_service') and self.brevo_service):
+                        print("💡 Attempting to send client email via Brevo API as fallback...")
+                        brevo_success = self._send_brevo_email(client_recipients, subject, html_body)
+                        if brevo_success:
+                            print(f"✅ Client email sent via Brevo API to {len(client_recipients)} recipients")
+                            client_success = True  # Mark as successful
+                        else:
+                            print("❌ Failed to send client email via Brevo API fallback")
+                            success = False
+                    else:
+                        success = False
             
             print(f"🏁 SMTP: Overall success = {success}")
             return success
