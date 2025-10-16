@@ -701,7 +701,9 @@ def handle_incoming_whatsapp():
             
             if is_interested:
                 logger.info(f"✅ Processing interested message from {sender_name or chat_id}: {message_text}")
-                return _create_enquiry_from_message(chat_id, message_text, sender_name, message_id)
+                logger.info(f"🚨🚨🚨 CALLING NEW FUNCTION - NO ENQUIRY WILL BE CREATED 🚨🚨🚨")
+                # For "Hi I am interested!" messages, send welcome message but don't create enquiry
+                return _handle_interested_message_without_enquiry(chat_id, message_text, sender_name, message_id)
             else:
                 logger.info(f"📥 Received WhatsApp message but not 'interested' message: {message_text}")
                 return jsonify({
@@ -1751,3 +1753,205 @@ def delete_enquiry(enquiry_id):
     except Exception as e:
         logger.error(f"Error deleting enquiry {enquiry_id}: {e}")
         return jsonify({'error': 'Failed to delete enquiry'}), 500
+
+def _handle_interested_message_without_enquiry(chat_id, message_text, sender_name, message_id):
+    """Handle interested messages by sending welcome message but NOT creating enquiry record"""
+    try:
+        # Extract sender information for logging
+        sender_number = chat_id.replace('@c.us', '')  # Remove @c.us suffix
+        clean_number = ''.join(filter(str.isdigit, sender_number))
+        
+        # Determine display name for logging
+        if sender_name and sender_name.strip() and sender_name.strip() != 'null' and sender_name.strip() != '':
+            display_name = sender_name.strip()
+        else:
+            display_name = f"WhatsApp User {clean_number}"
+        
+        logger.info(f"🚨🚨🚨 NEW FUNCTION CALLED - HANDLING INTERESTED MESSAGE WITHOUT CREATING ENQUIRY 🚨🚨🚨")
+        logger.info(f"📋 Handling interested message WITHOUT creating enquiry:")
+        logger.info(f"   Chat ID: {chat_id}")
+        logger.info(f"   Clean Number: {clean_number}")
+        logger.info(f"   Display Name: {display_name}")
+        logger.info(f"   Message: {message_text}")
+        logger.info(f"   Action: Send welcome message only, NO enquiry creation")
+        logger.info(f"🚨🚨🚨 THIS IS THE NEW BEHAVIOR - NO ENQUIRY WILL BE CREATED 🚨🚨🚨")
+        
+        # Send welcome message without creating enquiry
+        if whatsapp_service and whatsapp_service.api_available:
+            try:
+                logger.info(f"📤 Sending welcome message to {display_name} ({clean_number}) without creating enquiry...")
+                
+                # Create a minimal enquiry-like object just for message formatting
+                temp_enquiry_data = {
+                    'wati_name': display_name,
+                    'business_nature': 'your business'
+                }
+                
+                welcome_message_result = whatsapp_service.send_enquiry_message(temp_enquiry_data, 'new_enquiry')
+                
+                if welcome_message_result['success']:
+                    logger.info(f"✅ Welcome message sent successfully to {chat_id} WITHOUT creating enquiry")
+                    logger.info(f"   Message ID: {welcome_message_result.get('message_id', 'N/A')}")
+                    
+                    # Emit success notification
+                    try:
+                        from app import socketio
+                        notification = {
+                            'type': 'webhook_status',
+                            'status': 'success',
+                            'message': f"✅ WhatsApp welcome message sent to {display_name} (NO enquiry created as requested)",
+                            'details': {
+                                'message_type': 'welcome_message_no_enquiry',
+                                'recipient': chat_id,
+                                'mobile_number': clean_number,
+                                'sender_name': sender_name,
+                                'message_id': welcome_message_result.get('message_id', 'unknown'),
+                                'enquiry_created': False,
+                                'reason': 'Interested message - welcome only, no enquiry per configuration'
+                            },
+                            'timestamp': datetime.utcnow().isoformat()
+                        }
+                        socketio.emit('webhook_notification', notification)
+                    except Exception as socket_error:
+                        logger.error(f"❌ Error emitting socket event: {socket_error}")
+                        
+                    return jsonify({
+                        'success': True,
+                        'message': 'Welcome message sent without creating enquiry',
+                        'mobile_number': clean_number,
+                        'display_name': display_name,
+                        'enquiry_created': False,
+                        'action': 'welcome_message_only'
+                    }), 200
+                    
+                else:
+                    error_msg = welcome_message_result.get('error', 'Unknown error')
+                    logger.error(f"❌ Failed to send welcome message to {chat_id}: {error_msg}")
+                    
+                    # Check for quota exceeded error
+                    quota_exceeded = (
+                        welcome_message_result.get('status_code') == 466 or 
+                        welcome_message_result.get('quota_exceeded') or 
+                        'quota exceeded' in error_msg.lower() or 
+                        'monthly quota' in error_msg.lower()
+                    )
+                    
+                    if quota_exceeded:
+                        logger.warning(f"🚨 GreenAPI QUOTA LIMIT REACHED for {chat_id}")
+                        
+                        # Emit quota exceeded notification
+                        try:
+                            from app import socketio
+                            notification = {
+                                'type': 'webhook_status',
+                                'status': 'warning',
+                                'message': f"⚠️ GreenAPI quota limit reached! Welcome message not sent to {display_name} (No enquiry created)",
+                                'details': {
+                                    'message_type': 'welcome_message_no_enquiry',
+                                    'recipient': chat_id,
+                                    'mobile_number': clean_number,
+                                    'error': error_msg,
+                                    'quota_exceeded': True,
+                                    'working_test_number': welcome_message_result.get('working_test_number', '8106811285'),
+                                    'upgrade_url': welcome_message_result.get('upgrade_url', 'https://console.green-api.com'),
+                                    'enquiry_created': False
+                                },
+                                'timestamp': datetime.utcnow().isoformat()
+                            }
+                            socketio.emit('webhook_notification', notification)
+                        except Exception as socket_error:
+                            logger.error(f"❌ Error emitting socket event: {socket_error}")
+                    else:
+                        # Emit general error notification
+                        try:
+                            from app import socketio
+                            notification = {
+                                'type': 'webhook_status',
+                                'status': 'error',
+                                'message': f"❌ Failed to send WhatsApp welcome message to {display_name}: {error_msg} (No enquiry created)",
+                                'details': {
+                                    'message_type': 'welcome_message_no_enquiry',
+                                    'recipient': chat_id,
+                                    'mobile_number': clean_number,
+                                    'error': error_msg,
+                                    'enquiry_created': False
+                                },
+                                'timestamp': datetime.utcnow().isoformat()
+                            }
+                            socketio.emit('webhook_notification', notification)
+                        except Exception as socket_error:
+                            logger.error(f"❌ Error emitting socket event: {socket_error}")
+                    
+                    return jsonify({
+                        'success': False,
+                        'error': f'Failed to send welcome message: {error_msg}',
+                        'mobile_number': clean_number,
+                        'enquiry_created': False
+                    }), 500
+                    
+            except Exception as welcome_error:
+                logger.error(f"❌ Error sending welcome message: {str(welcome_error)}")
+                
+                # Emit exception notification
+                try:
+                    from app import socketio
+                    notification = {
+                        'type': 'webhook_status',
+                        'status': 'error',
+                        'message': f"❌ Exception while sending WhatsApp welcome message to {display_name}: {str(welcome_error)} (No enquiry created)",
+                        'details': {
+                            'message_type': 'welcome_message_no_enquiry',
+                            'recipient': chat_id,
+                            'mobile_number': clean_number,
+                            'error': str(welcome_error),
+                            'enquiry_created': False
+                        },
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+                    socketio.emit('webhook_notification', notification)
+                except Exception as socket_error:
+                    logger.error(f"❌ Error emitting socket event: {socket_error}")
+                
+                return jsonify({
+                    'success': False,
+                    'error': f'Error sending welcome message: {str(welcome_error)}',
+                    'mobile_number': clean_number,
+                    'enquiry_created': False
+                }), 500
+        else:
+            logger.error("❌ WhatsApp service not available")
+            
+            # Emit service unavailable notification
+            try:
+                from app import socketio
+                notification = {
+                    'type': 'webhook_status',
+                    'status': 'error',
+                    'message': "❌ WhatsApp service not available - Check GreenAPI configuration (No enquiry created)",
+                    'details': {
+                        'message_type': 'welcome_message_no_enquiry',
+                        'recipient': chat_id,
+                        'mobile_number': clean_number,
+                        'error': 'Service not available',
+                        'enquiry_created': False
+                    },
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                socketio.emit('webhook_notification', notification)
+            except Exception as socket_error:
+                logger.error(f"❌ Error emitting socket event: {socket_error}")
+            
+            return jsonify({
+                'success': False,
+                'error': 'WhatsApp service not available',
+                'mobile_number': clean_number,
+                'enquiry_created': False
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"❌ Error handling interested message without enquiry: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Error processing interested message: {str(e)}',
+            'enquiry_created': False
+        }), 500
