@@ -308,6 +308,54 @@ def create_public_enquiry():
         # Clean mobile number
         clean_number = ''.join(filter(str.isdigit, mobile_number))
         
+        # Check if mobile number already exists
+        existing_enquiry = enquiries_collection.find_one({'mobile_number': clean_number})
+        if existing_enquiry:
+            logger.info(f"Mobile number {clean_number} already exists in database")
+            
+            # Send WhatsApp message to existing user
+            whatsapp_result = None
+            try:
+                if whatsapp_service and whatsapp_service.api_available:
+                    logger.info(f"Sending WhatsApp message to existing user: {clean_number}")
+                    
+                    # Create a temporary enquiry object for the WhatsApp message
+                    temp_enquiry = {
+                        'wati_name': wati_name,
+                        'mobile_number': clean_number
+                    }
+                    
+                    # Send the new_enquiry_public_form message
+                    whatsapp_result = whatsapp_service.send_enquiry_message(temp_enquiry, 'new_enquiry_public_form')
+                    
+                    if whatsapp_result['success']:
+                        logger.info(f"WhatsApp message sent successfully to existing user {clean_number}")
+                    else:
+                        error_msg = whatsapp_result.get('error', 'Unknown error')
+                        logger.error(f"Failed to send WhatsApp message to existing user {clean_number}: {error_msg}")
+                else:
+                    logger.error("WhatsApp service is not available")
+                    whatsapp_result = {
+                        'success': False,
+                        'error': 'WhatsApp service not available'
+                    }
+            except Exception as whatsapp_error:
+                logger.error(f"Error sending WhatsApp message to existing user: {str(whatsapp_error)}")
+                whatsapp_result = {
+                    'success': False,
+                    'error': f'Error sending WhatsApp message: {str(whatsapp_error)}'
+                }
+            
+            return jsonify({
+                'success': False,
+                'error': 'mobile_exists',
+                'message': 'This mobile number has already been registered. Please contact us via WhatsApp.',
+                'whatsapp_number': '8106811285',
+                'existing_enquiry_id': str(existing_enquiry['_id']),
+                'whatsapp_sent': whatsapp_result['success'] if whatsapp_result else False,
+                'whatsapp_error': whatsapp_result.get('error') if whatsapp_result else None
+            }), 409
+        
         # Create enquiry record
         new_enquiry = {
             'date': datetime.utcnow(),
