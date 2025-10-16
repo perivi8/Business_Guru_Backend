@@ -942,8 +942,8 @@ def update_client(client_id):
         
         data = request.get_json()
         status = data.get('status')
-        feedback = data.get('feedback', '')
-        comments = data.get('comments', '')
+        feedback = data.get('feedback')
+        comments = data.get('comments')
         
         print(f"Update data - Status: {status}, Feedback: {feedback}, Comments: {comments}")
         
@@ -1098,7 +1098,14 @@ def update_client(client_id):
         # This ensures emails are sent for mark interested, not interested, hold, etc., but not for comments
         is_comment_only_update = (status is None and feedback is None and comments is not None)
         
-        if (status is not None or feedback is not None) and not is_comment_only_update:
+        print(f"🔍 Comment-only update analysis:")
+        print(f"   Status: {status} (is None: {status is None})")
+        print(f"   Feedback: {feedback} (is None: {feedback is None})")
+        print(f"   Comments: {comments} (is not None: {comments is not None})")
+        print(f"   Is comment-only update: {is_comment_only_update}")
+        
+        # Only send email notifications if status or feedback is being updated (not for comments)
+        if status is not None or feedback is not None:
             print(f"📧 Triggering email notification for: {update_type}")
             import threading
             notification_thread = threading.Thread(target=send_notifications)
@@ -1530,12 +1537,18 @@ def update_client_details(client_id):
         # Send email notification if admin made changes (but NOT for comment-only updates)
         if user_role == 'admin':
             # Check if this is a comment-only update
+            # More robust detection: check if only comments and system fields are being updated
+            system_fields = {'updated_at', 'updated_by'}
+            actual_update_fields = set(update_data.keys()) - system_fields
             is_comment_only_update = (
-                len(update_data) <= 3 and  # Only updated_at, updated_by, and comments
-                'comments' in update_data and
-                'updated_at' in update_data and
-                'updated_by' in update_data
+                len(actual_update_fields) == 1 and 
+                'comments' in actual_update_fields
             )
+            
+            print(f"🔍 Admin update analysis:")
+            print(f"   All update fields: {list(update_data.keys())}")
+            print(f"   Non-system fields: {list(actual_update_fields)}")
+            print(f"   Is comment-only update: {is_comment_only_update}")
             
             # Only send email for non-comment updates
             if not is_comment_only_update:
@@ -1554,7 +1567,9 @@ def update_client_details(client_id):
                     )
                     print(f"📧 Email notification sent for client update (non-comment)")
                 else:
-                    print(f"📧 Email notification skipped - comment-only update")
+                    print(f"📧 Email service not available - skipping notification")
+            else:
+                print(f"📧 Email notification skipped - comment-only update detected")
         
         # Send WhatsApp notification for client update
         whatsapp_results = []
@@ -1564,11 +1579,12 @@ def update_client_details(client_id):
                 updated_client = clients_collection.find_one({'_id': ObjectId(client_id)})
                 
                 # Check if this is a comment-only update
+                # Use the same robust detection logic as email notifications
+                system_fields = {'updated_at', 'updated_by'}
+                actual_update_fields = set(update_data.keys()) - system_fields
                 is_comment_only_update = (
-                    len(update_data) <= 3 and  # Only updated_at, updated_by, and comments
-                    'comments' in update_data and
-                    'updated_at' in update_data and
-                    'updated_by' in update_data
+                    len(actual_update_fields) == 1 and 
+                    'comments' in actual_update_fields
                 )
                 
                 # Only send multiple update messages if it's NOT a comment-only update
