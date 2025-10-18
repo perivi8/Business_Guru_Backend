@@ -1166,6 +1166,9 @@ def get_client_details(client_id):
             for doc_type, file_info in client['documents'].items():
                 if isinstance(file_info, dict) and file_info.get('storage_type') == 'cloudinary':
                     # For Cloudinary files, provide direct access
+                    # Get existing verification status if it exists
+                    existing_doc = client.get('processed_documents', {}).get(doc_type, {})
+                    
                     processed_documents[doc_type] = {
                         'file_name': file_info.get('original_filename', 'Unknown'),
                         'file_size': file_info.get('bytes', 0),
@@ -1176,7 +1179,12 @@ def get_client_details(client_id):
                         'direct_url': file_info['url'],  # Direct Cloudinary URL as fallback
                         'public_id': file_info.get('public_id', ''),
                         'is_image': file_info.get('format', '').lower() in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
-                        'is_pdf': file_info.get('format', '').lower() == 'pdf'
+                        'is_pdf': file_info.get('format', '').lower() == 'pdf',
+                        # Verification status fields
+                        'verification_status': existing_doc.get('verification_status', 'pending'),
+                        'verification_notes': existing_doc.get('verification_notes', ''),
+                        'verified_by': existing_doc.get('verified_by', ''),
+                        'verified_at': existing_doc.get('verified_at', '')
                     }
                 elif isinstance(file_info, str) and os.path.exists(file_info):
                     # For local files
@@ -1184,6 +1192,9 @@ def get_client_details(client_id):
                     file_size = file_stats.st_size
                     file_name = os.path.basename(file_info)
                     file_ext = os.path.splitext(file_name)[1].lower().lstrip('.')
+                    
+                    # Get existing verification status if it exists
+                    existing_doc = client.get('processed_documents', {}).get(doc_type, {})
                     
                     processed_documents[doc_type] = {
                         'file_name': file_name,
@@ -1194,10 +1205,18 @@ def get_client_details(client_id):
                         'download_url': f'/api/clients/{client_id}/download/{doc_type}',
                         'direct_url': f'/api/clients/{client_id}/download/{doc_type}',
                         'is_image': file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
-                        'is_pdf': file_ext == 'pdf'
+                        'is_pdf': file_ext == 'pdf',
+                        # Verification status fields
+                        'verification_status': existing_doc.get('verification_status', 'pending'),
+                        'verification_notes': existing_doc.get('verification_notes', ''),
+                        'verified_by': existing_doc.get('verified_by', ''),
+                        'verified_at': existing_doc.get('verified_at', '')
                     }
                 else:
                     # Handle missing or invalid files
+                    # Get existing verification status if it exists
+                    existing_doc = client.get('processed_documents', {}).get(doc_type, {})
+                    
                     processed_documents[doc_type] = {
                         'file_name': 'File not found',
                         'file_size': 0,
@@ -1208,7 +1227,12 @@ def get_client_details(client_id):
                         'direct_url': None,
                         'is_image': False,
                         'is_pdf': False,
-                        'error': 'File not found or invalid format'
+                        'error': 'File not found or invalid format',
+                        # Verification status fields
+                        'verification_status': existing_doc.get('verification_status', 'pending'),
+                        'verification_notes': existing_doc.get('verification_notes', ''),
+                        'verified_by': existing_doc.get('verified_by', ''),
+                        'verified_at': existing_doc.get('verified_at', '')
                     }
             
             client['processed_documents'] = processed_documents
@@ -1418,9 +1442,17 @@ def update_client_details(client_id):
             print(f"☁️ Using Cloudinary ONLY for document storage - no local files")
             print(f"📁 Processing {len(files)} files for client update {client_id}")
             
+            # Track which documents are being re-uploaded to reset their verification status
+            reuploaded_documents = []
+            
             for key, file in files.items():
                 if file and file.filename:
                     print(f"📄 Processing file: {key} -> {file.filename}")
+                    
+                    # Check if this document already exists (re-upload)
+                    if key in client.get('documents', {}):
+                        print(f"🔄 Document {key} is being re-uploaded - will reset verification status")
+                        reuploaded_documents.append(key)
                     
                     try:
                         if is_tmis_user:
@@ -1514,6 +1546,26 @@ def update_client_details(client_id):
                 'Easebuzz': 'pending'
             }
             print(f"💾 Setting default payment gateway status: {update_data['payment_gateways_status']}")
+        
+        # Reset verification status for re-uploaded documents
+        if 'reuploaded_documents' in locals() and reuploaded_documents:
+            print(f"🔄 Resetting verification status for re-uploaded documents: {reuploaded_documents}")
+            
+            # Reset verification status for each re-uploaded document
+            for doc_type in reuploaded_documents:
+                # Reset in processed_documents if it exists
+                if f'processed_documents.{doc_type}.verification_status' not in update_data:
+                    # Use $unset to remove verification fields, which will default to pending
+                    clients_collection.update_one(
+                        {'_id': ObjectId(client_id)},
+                        {'$unset': {
+                            f'processed_documents.{doc_type}.verification_status': '',
+                            f'processed_documents.{doc_type}.verification_notes': '',
+                            f'processed_documents.{doc_type}.verified_by': '',
+                            f'processed_documents.{doc_type}.verified_at': ''
+                        }}
+                    )
+                    print(f"✅ Reset verification status for document: {doc_type}")
         
         # Add updated timestamp and updated_by
         update_data['updated_at'] = datetime.utcnow()
@@ -2554,4 +2606,172 @@ def download_document_raw(client_id, document_type):
         
     except Exception as e:
         print(f"❌ Raw download error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@client_bp.route('/clients/<client_id>/verify-document', methods=['POST'])
+@jwt_required()
+def verify_document(client_id):
+    """Verify or reject a document for a client"""
+    try:
+        # Get current user info
+        current_user = get_jwt_identity()
+        current_user_id = current_user.get('user_id') if isinstance(current_user, dict) else current_user
+        user_email = current_user.get('email') if isinstance(current_user, dict) else None
+        
+        print(f"📋 Document verification request by user: {current_user_id} for client: {client_id}")
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        document_type = data.get('documentType')
+        status = data.get('status')  # 'verified' or 'rejected'
+        notes = data.get('notes', '')
+        
+        print(f"   Document type: {document_type}")
+        print(f"   Status: {status}")
+        print(f"   Notes: {notes}")
+        
+        if not document_type or not status:
+            return jsonify({'error': 'Document type and status are required'}), 400
+        
+        if status not in ['verified', 'rejected']:
+            return jsonify({'error': 'Status must be either "verified" or "rejected"'}), 400
+        
+        # Get client from database
+        client = clients_collection.find_one({'_id': ObjectId(client_id)})
+        if not client:
+            return jsonify({'error': 'Client not found'}), 404
+        
+        # Check if document exists in either documents or processed_documents
+        document_exists = False
+        if 'documents' in client and document_type in client['documents']:
+            document_exists = True
+        elif 'processed_documents' in client and document_type in client['processed_documents']:
+            document_exists = True
+            
+        if not document_exists:
+            print(f"❌ Document {document_type} not found for client {client_id}")
+            print(f"   Available documents: {list(client.get('documents', {}).keys())}")
+            print(f"   Available processed_documents: {list(client.get('processed_documents', {}).keys())}")
+            return jsonify({'error': f'Document {document_type} not found'}), 404
+        
+        # Update document verification status
+        verification_data = {
+            'verification_status': status,
+            'verification_notes': notes,
+            'verified_by': user_email or current_user_id,
+            'verified_at': datetime.utcnow().isoformat()
+        }
+        
+        # Ensure processed_documents structure exists and update verification status
+        # First, ensure the processed_documents field exists if it doesn't
+        if 'processed_documents' not in client:
+            clients_collection.update_one(
+                {'_id': ObjectId(client_id)},
+                {'$set': {'processed_documents': {}}}
+            )
+        
+        # Ensure the specific document entry exists in processed_documents
+        if document_type not in client.get('processed_documents', {}):
+            # Initialize the document entry with basic info from documents collection
+            doc_info = client.get('documents', {}).get(document_type, {})
+            if isinstance(doc_info, dict):
+                file_name = doc_info.get('original_filename', 'Unknown')
+                file_size = doc_info.get('bytes', 0)
+            else:
+                file_name = 'Unknown'
+                file_size = 0
+                
+            clients_collection.update_one(
+                {'_id': ObjectId(client_id)},
+                {'$set': {
+                    f'processed_documents.{document_type}': {
+                        'file_name': file_name,
+                        'file_size': file_size,
+                        'verification_status': 'pending',
+                        'verification_notes': '',
+                        'verified_by': '',
+                        'verified_at': ''
+                    }
+                }}
+            )
+        
+        # Now update the document verification status
+        update_query = {
+            f'processed_documents.{document_type}.verification_status': status,
+            f'processed_documents.{document_type}.verification_notes': notes,
+            f'processed_documents.{document_type}.verified_by': user_email or current_user_id,
+            f'processed_documents.{document_type}.verified_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow()
+        }
+        
+        result = clients_collection.update_one(
+            {'_id': ObjectId(client_id)},
+            {'$set': update_query}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({'error': 'Failed to update document verification status'}), 500
+        
+        print(f"✅ Document {document_type} {status} for client {client_id} by {user_email or current_user_id}")
+        
+        return jsonify({
+            'message': f'Document {status} successfully',
+            'document_type': document_type,
+            'status': status,
+            'verified_by': user_email or current_user_id,
+            'verified_at': verification_data['verified_at']
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error verifying document: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@client_bp.route('/clients/<client_id>/debug-documents', methods=['GET'])
+@jwt_required()
+def debug_client_documents(client_id):
+    """Debug endpoint to check what documents exist for a client"""
+    try:
+        # Get client from database
+        client = clients_collection.find_one({'_id': ObjectId(client_id)})
+        if not client:
+            return jsonify({'error': 'Client not found'}), 404
+        
+        debug_info = {
+            'client_id': client_id,
+            'has_documents': 'documents' in client,
+            'has_processed_documents': 'processed_documents' in client,
+            'documents_keys': list(client.get('documents', {}).keys()),
+            'processed_documents_keys': list(client.get('processed_documents', {}).keys()),
+            'documents_sample': {},
+            'processed_documents_sample': {}
+        }
+        
+        # Sample first few documents
+        if 'documents' in client:
+            for i, (key, value) in enumerate(client['documents'].items()):
+                if i < 3:  # Only show first 3
+                    debug_info['documents_sample'][key] = {
+                        'type': type(value).__name__,
+                        'has_original_filename': 'original_filename' in value if isinstance(value, dict) else False,
+                        'has_bytes': 'bytes' in value if isinstance(value, dict) else False,
+                        'value_preview': str(value)[:100] if not isinstance(value, dict) else 'dict'
+                    }
+        
+        if 'processed_documents' in client:
+            for i, (key, value) in enumerate(client['processed_documents'].items()):
+                if i < 3:  # Only show first 3
+                    debug_info['processed_documents_sample'][key] = {
+                        'type': type(value).__name__,
+                        'has_verification_status': 'verification_status' in value if isinstance(value, dict) else False,
+                        'verification_status': value.get('verification_status') if isinstance(value, dict) else None
+                    }
+        
+        return jsonify(debug_info), 200
+        
+    except Exception as e:
+        print(f"❌ Error in debug endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
