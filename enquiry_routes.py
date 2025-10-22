@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from bson import ObjectId
 from datetime import datetime, timedelta
 import logging
@@ -2032,7 +2032,7 @@ def upload_business_document():
         if file_size > 10 * 1024 * 1024:  # 10MB (increased for PDFs)
             return jsonify({'error': 'File size must be less than 10MB'}), 400
         
-        # Check if Cloudinary is available
+        # Check if Cloudinary is available - REQUIRED for uploads
         if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
             return jsonify({
                 'error': 'Document upload service unavailable. Cloudinary is required for document storage.',
@@ -2043,7 +2043,7 @@ def upload_business_document():
         temp_enquiry_id = f"public_{uuid.uuid4()}"
         
         try:
-            # Upload to Cloudinary
+            # Upload to Cloudinary ONLY
             uploaded_file = upload_to_cloudinary_enquiry(file, temp_enquiry_id, 'business_document')
             
             logger.info(f"Business document uploaded successfully to Cloudinary: {uploaded_file['public_id']}")
@@ -2098,7 +2098,7 @@ def upload_enquiry_business_document(enquiry_id):
         if file_size > 10 * 1024 * 1024:  # 10MB
             return jsonify({'error': 'File size must be less than 10MB'}), 400
         
-        # Check if Cloudinary is available
+        # Check if Cloudinary is available - REQUIRED for uploads
         if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
             return jsonify({
                 'error': 'Document upload service unavailable. Cloudinary is required for document storage.',
@@ -2106,7 +2106,7 @@ def upload_enquiry_business_document(enquiry_id):
             }), 503
         
         try:
-            # Upload to Cloudinary
+            # Upload to Cloudinary ONLY
             uploaded_file = upload_to_cloudinary_enquiry(file, enquiry_id, 'business_document')
             
             # Update enquiry with business document URL
@@ -2191,3 +2191,5 @@ def remove_enquiry_business_document(enquiry_id):
     except Exception as e:
         logger.error(f"Error removing business document from enquiry {enquiry_id}: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+# Local file serving removed - using Cloudinary only

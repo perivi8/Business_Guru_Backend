@@ -251,7 +251,7 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
     """Copy business document from enquiry to client's Cloudinary folder"""
     try:
         if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
-            print(f"⚠️ Cloudinary not available - cannot copy business document")
+            print(f"❌ Cloudinary not available - cannot copy business document")
             return None
         
         print(f"📄 Copying business document from enquiry to client folder")
@@ -467,7 +467,7 @@ def create_client():
         # Handle file uploads - CLOUDINARY ONLY (no local storage)
         uploaded_files = {}
         
-        # Check if Cloudinary is available - only if files are being uploaded
+        # Check if files are being uploaded and ensure Cloudinary is available
         has_files_to_upload = any(file and file.filename for file in files.values()) if files else False
         
         if has_files_to_upload and (not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED):
@@ -500,7 +500,7 @@ def create_client():
                 except Exception as e:
                     print(f"❌ Error uploading {file.filename} to Cloudinary: {str(e)}")
                     
-                    # Retry once for all users
+                    # Retry once for Cloudinary
                     print(f"🔄 Retrying Cloudinary upload for {file.filename}")
                     try:
                         # Reset file pointer and try again
@@ -616,6 +616,8 @@ def create_client():
     except Exception as e:
         print(f"Error creating client: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# Local file serving removed - using Cloudinary only
 
 @client_bp.route('/clients/test', methods=['GET'])
 def test_clients():
