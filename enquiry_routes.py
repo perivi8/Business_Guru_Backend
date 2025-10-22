@@ -229,12 +229,12 @@ def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
         
         print(f"📤 Enquiry document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
         print(f"🔗 Cloudinary URL: {result['secure_url']}")
-        print(f"📊 File size: {result['bytes']} bytes, Format: {result['format']}")
+        print(f"📊 File size: {result['bytes']} bytes, Format: {result.get('format', file_extension)}")
         
         return {
             'url': result['secure_url'],
             'public_id': result['public_id'],
-            'format': result['format'],
+            'format': result.get('format', file_extension),  # Use file extension if format not available (raw uploads)
             'bytes': result['bytes'],
             'original_filename': original_filename,
             'storage_type': 'cloudinary',
