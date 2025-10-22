@@ -1950,3 +1950,124 @@ def upload_business_document():
     except Exception as e:
         logger.error(f"Error uploading business document: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@enquiry_bp.route('/<enquiry_id>/business-document', methods=['POST'])
+@jwt_required()
+def upload_enquiry_business_document(enquiry_id):
+    """Upload business document for a specific enquiry"""
+    try:
+        if not enquiries_collection:
+            return jsonify({'error': 'Database connection not available'}), 503
+        
+        # Check if file is present
+        if 'business_document' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['business_document']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_extension not in allowed_extensions:
+            return jsonify({'error': 'Invalid file type. Only PDF, JPG, PNG, DOC, and DOCX files are allowed'}), 400
+        
+        # Validate file size (10MB max)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > 10 * 1024 * 1024:  # 10MB
+            return jsonify({'error': 'File size must be less than 10MB'}), 400
+        
+        # Create uploads directory if it doesn't exist
+        upload_dir = os.path.join(os.getcwd(), 'uploads', 'business_documents')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generate unique filename
+        unique_filename = f"enquiry_{enquiry_id}_{uuid.uuid4()}_{secure_filename(file.filename)}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        # Save file
+        file.save(file_path)
+        
+        # Return file URL with server base URL
+        base_url = request.url_root.rstrip('/')
+        file_url = f"{base_url}/uploads/business_documents/{unique_filename}"
+        
+        # Update enquiry with business document URL
+        result = enquiries_collection.update_one(
+            {'_id': ObjectId(enquiry_id)},
+            {
+                '$set': {
+                    'business_document_url': file_url,
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.matched_count == 0:
+            # Clean up uploaded file if enquiry not found
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return jsonify({'error': 'Enquiry not found'}), 404
+        
+        logger.info(f"Business document uploaded for enquiry {enquiry_id}: {unique_filename}")
+        return jsonify({
+            'success': True,
+            'business_document_url': file_url,
+            'filename': unique_filename
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error uploading business document for enquiry {enquiry_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@enquiry_bp.route('/<enquiry_id>/business-document', methods=['DELETE'])
+@jwt_required()
+def remove_enquiry_business_document(enquiry_id):
+    """Remove business document from a specific enquiry"""
+    try:
+        if not enquiries_collection:
+            return jsonify({'error': 'Database connection not available'}), 503
+        
+        # Get current enquiry to find the file to delete
+        enquiry = enquiries_collection.find_one({'_id': ObjectId(enquiry_id)})
+        if not enquiry:
+            return jsonify({'error': 'Enquiry not found'}), 404
+        
+        # Get the current business document URL
+        current_doc_url = enquiry.get('business_document_url')
+        
+        # Update enquiry to remove business document URL
+        result = enquiries_collection.update_one(
+            {'_id': ObjectId(enquiry_id)},
+            {
+                '$unset': {'business_document_url': ''},
+                '$set': {'updated_at': datetime.utcnow()}
+            }
+        )
+        
+        # Try to delete the physical file if it exists
+        if current_doc_url:
+            try:
+                # Extract filename from URL
+                filename = current_doc_url.split('/')[-1]
+                file_path = os.path.join(os.getcwd(), 'uploads', 'business_documents', filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Deleted business document file: {filename}")
+            except Exception as file_error:
+                logger.warning(f"Could not delete business document file: {file_error}")
+        
+        logger.info(f"Business document removed from enquiry {enquiry_id}")
+        return jsonify({
+            'success': True,
+            'message': 'Business document removed successfully'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error removing business document from enquiry {enquiry_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
