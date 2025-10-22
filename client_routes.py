@@ -161,18 +161,33 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
             # Fallback to client_id if names not available
             folder_path = f"tmis-business-guru/clients/{client_id}"
         
-        # Upload to Cloudinary
-        result = cloudinary.uploader.upload(
-            file,
-            folder=folder_path,
-            public_id=unique_filename,
-            resource_type="auto",  # Automatically detect file type (image, pdf, etc.)
-            use_filename=True,
-            unique_filename=True,
-            overwrite=False,
-            quality="auto",  # Automatic quality optimization
-            fetch_format="auto"  # Automatic format optimization
-        )
+        # Determine resource type based on file extension to preserve PDF format
+        file_extension = original_filename.lower().split('.')[-1] if '.' in original_filename else ''
+        
+        if file_extension == 'pdf':
+            # Upload PDFs as raw files to preserve format
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="raw",  # Use raw for PDFs to preserve format
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False
+            )
+        else:
+            # Upload images and other files normally
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="auto",  # Auto detect for non-PDF files
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False,
+                quality="auto",  # Automatic quality optimization for images
+                fetch_format="auto"  # Automatic format optimization for images
+            )
         
         print(f"📤 Document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
         print(f"🔗 Cloudinary URL: {result['secure_url']}")
@@ -231,6 +246,73 @@ def delete_from_cloudinary(public_id, resource_type="auto"):
     except Exception as e:
         print(f"❌ Error deleting from Cloudinary: {str(e)}")
         return False
+
+def copy_business_document_to_client_folder(enquiry_document_url, client_id, trade_name=None, business_name=None):
+    """Copy business document from enquiry to client's Cloudinary folder"""
+    try:
+        if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
+            print(f"⚠️ Cloudinary not available - cannot copy business document")
+            return None
+        
+        print(f"📄 Copying business document from enquiry to client folder")
+        print(f"🔗 Source URL: {enquiry_document_url}")
+        
+        # Create folder path for client
+        if trade_name and business_name:
+            safe_trade_name = secure_filename(trade_name).replace('_', '-')
+            safe_business_name = secure_filename(business_name).replace('_', '-')
+            folder_path = f"tmis-business-guru/clients/{safe_trade_name}/{safe_business_name}"
+        else:
+            folder_path = f"tmis-business-guru/clients/{client_id}"
+        
+        # Generate unique filename for the copied document
+        unique_filename = f"business_document_{client_id}"
+        
+        # Determine if source document is PDF from URL
+        is_pdf_document = enquiry_document_url.lower().endswith('.pdf') or 'pdf' in enquiry_document_url.lower()
+        
+        if is_pdf_document:
+            # Upload PDFs as raw files to preserve format
+            result = cloudinary.uploader.upload(
+                enquiry_document_url,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="raw",  # Use raw for PDFs to preserve format
+                use_filename=False,
+                unique_filename=True,
+                overwrite=False
+            )
+        else:
+            # Upload other files normally
+            result = cloudinary.uploader.upload(
+                enquiry_document_url,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="auto",
+                use_filename=False,
+                unique_filename=True,
+                overwrite=False,
+                quality="auto",
+                fetch_format="auto"
+            )
+        
+        print(f"✅ Business document copied to client folder: {result['public_id']}")
+        print(f"🔗 New Cloudinary URL: {result['secure_url']}")
+        
+        return {
+            'url': result['secure_url'],
+            'public_id': result['public_id'],
+            'format': result['format'],
+            'bytes': result['bytes'],
+            'original_filename': 'business_document',
+            'storage_type': 'cloudinary',
+            'created_at': result['created_at'],
+            'copied_from_enquiry': True
+        }
+        
+    except Exception as e:
+        print(f"❌ Error copying business document to client folder: {str(e)}")
+        return None
 
 # Create Blueprint with API prefix
 client_bp = Blueprint('client', __name__)
@@ -432,6 +514,27 @@ def create_client():
                             'error': f'Failed to upload document: {file.filename}',
                             'details': 'Cloudinary upload failed after retry. Please try again later.'
                         }), 500
+        
+        # Handle business document from enquiry
+        business_document_from_enquiry = data.get('business_document_from_enquiry')
+        if business_document_from_enquiry and business_document_from_enquiry.strip():
+            print(f"📄 Processing business document from enquiry: {business_document_from_enquiry}")
+            try:
+                # Copy the business document from enquiry to client's Cloudinary folder
+                copied_document = copy_business_document_to_client_folder(
+                    business_document_from_enquiry, 
+                    client_id, 
+                    data.get('trade_name', ''), 
+                    data.get('business_name', '')
+                )
+                if copied_document:
+                    uploaded_files['business_document'] = copied_document
+                    print(f"✅ Successfully copied business document to client folder")
+                else:
+                    print(f"⚠️ Failed to copy business document from enquiry")
+            except Exception as e:
+                print(f"❌ Error copying business document from enquiry: {str(e)}")
+                # Continue without the business document
         
         # Extract information from documents (only if DocumentProcessor is available)
         extracted_data = {}

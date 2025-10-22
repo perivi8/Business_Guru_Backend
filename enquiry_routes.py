@@ -13,6 +13,49 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Try to import cloudinary, but make it optional
+try:
+    import cloudinary
+    import cloudinary.uploader
+    import cloudinary.api
+    CLOUDINARY_AVAILABLE = True
+    print("✅ Cloudinary imported successfully in enquiry routes")
+except ImportError as e:
+    print(f"⚠️ Warning: Cloudinary not available in enquiry routes: {e}")
+    CLOUDINARY_AVAILABLE = False
+    cloudinary = None
+except Exception as e:
+    print(f"⚠️ Warning: Cloudinary import failed in enquiry routes: {e}")
+    CLOUDINARY_AVAILABLE = False
+    cloudinary = None
+
+# Cloudinary configuration
+CLOUDINARY_ENABLED = os.getenv('CLOUDINARY_ENABLED', 'false').lower() == 'true'
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
+
+# Initialize Cloudinary if enabled and available
+if CLOUDINARY_AVAILABLE and CLOUDINARY_ENABLED and CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    try:
+        cloudinary.config(
+            cloud_name=CLOUDINARY_CLOUD_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET,
+            secure=True
+        )
+        print(f"✅ Cloudinary initialized successfully in enquiry routes with cloud: {CLOUDINARY_CLOUD_NAME}")
+    except Exception as e:
+        print(f"❌ Failed to initialize Cloudinary in enquiry routes: {str(e)}")
+        CLOUDINARY_ENABLED = False
+else:
+    if not CLOUDINARY_AVAILABLE:
+        print("⚠️ Cloudinary library not available in enquiry routes")
+    elif not CLOUDINARY_ENABLED:
+        print("⚠️ Cloudinary not enabled in enquiry routes")
+    else:
+        print("⚠️ Cloudinary configuration incomplete in enquiry routes")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -137,6 +180,70 @@ def parse_date_safely(date_input):
     except Exception as e:
         logger.error(f"Error parsing date {date_input}: {e}")
         return datetime.now()
+
+def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
+    """Upload file to Cloudinary cloud storage for enquiry documents"""
+    try:
+        if not CLOUDINARY_AVAILABLE:
+            raise Exception("Cloudinary library not available")
+        if not CLOUDINARY_ENABLED:
+            raise Exception("Cloudinary not configured")
+        
+        # Reset file pointer to beginning
+        file.seek(0)
+        
+        # Generate unique filename
+        original_filename = secure_filename(file.filename)
+        unique_filename = f"{doc_type}_{enquiry_id}_{uuid.uuid4()}_{original_filename}"
+        
+        # Create folder path for enquiry documents
+        folder_path = f"tmis-business-guru/enquiries/{enquiry_id}"
+        
+        # Determine resource type based on file extension to preserve PDF format
+        file_extension = original_filename.lower().split('.')[-1] if '.' in original_filename else ''
+        
+        if file_extension == 'pdf':
+            # Upload PDFs as raw files to preserve format
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="raw",  # Use raw for PDFs to preserve format
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False
+            )
+        else:
+            # Upload images and other files normally
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="auto",  # Auto detect for non-PDF files
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False,
+                quality="auto",  # Automatic quality optimization for images
+                fetch_format="auto"  # Automatic format optimization for images
+            )
+        
+        print(f"📤 Enquiry document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
+        print(f"🔗 Cloudinary URL: {result['secure_url']}")
+        print(f"📊 File size: {result['bytes']} bytes, Format: {result['format']}")
+        
+        return {
+            'url': result['secure_url'],
+            'public_id': result['public_id'],
+            'format': result['format'],
+            'bytes': result['bytes'],
+            'original_filename': original_filename,
+            'storage_type': 'cloudinary',
+            'created_at': result['created_at']
+        }
+        
+    except Exception as e:
+        print(f"❌ Error uploading to Cloudinary: {str(e)}")
+        raise
 
 @enquiry_bp.route('/enquiries', methods=['GET'])
 @jwt_required()
@@ -1922,30 +2029,39 @@ def upload_business_document():
         file_size = file.tell()
         file.seek(0)  # Reset file pointer
         
-        if file_size > 5 * 1024 * 1024:  # 5MB
-            return jsonify({'error': 'File size must be less than 5MB'}), 400
+        if file_size > 10 * 1024 * 1024:  # 10MB (increased for PDFs)
+            return jsonify({'error': 'File size must be less than 10MB'}), 400
         
-        # Create uploads directory if it doesn't exist
-        upload_dir = os.path.join(os.getcwd(), 'uploads', 'business_documents')
-        os.makedirs(upload_dir, exist_ok=True)
+        # Check if Cloudinary is available
+        if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
+            return jsonify({
+                'error': 'Document upload service unavailable. Cloudinary is required for document storage.',
+                'details': 'Please contact administrator to enable Cloudinary service.'
+            }), 503
         
-        # Generate unique filename
-        unique_filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
-        file_path = os.path.join(upload_dir, unique_filename)
+        # Generate temporary enquiry ID for public uploads
+        temp_enquiry_id = f"public_{uuid.uuid4()}"
         
-        # Save file
-        file.save(file_path)
-        
-        # Return file URL with server base URL
-        base_url = request.url_root.rstrip('/')
-        file_url = f"{base_url}/uploads/business_documents/{unique_filename}"
-        
-        logger.info(f"Business document uploaded successfully: {unique_filename}")
-        return jsonify({
-            'success': True,
-            'file_url': file_url,
-            'filename': unique_filename
-        }), 200
+        try:
+            # Upload to Cloudinary
+            uploaded_file = upload_to_cloudinary_enquiry(file, temp_enquiry_id, 'business_document')
+            
+            logger.info(f"Business document uploaded successfully to Cloudinary: {uploaded_file['public_id']}")
+            return jsonify({
+                'success': True,
+                'file_url': uploaded_file['url'],
+                'filename': uploaded_file['original_filename'],
+                'public_id': uploaded_file['public_id'],
+                'format': uploaded_file['format'],
+                'bytes': uploaded_file['bytes']
+            }), 200
+            
+        except Exception as upload_error:
+            logger.error(f"Error uploading to Cloudinary: {str(upload_error)}")
+            return jsonify({
+                'error': 'Failed to upload document to cloud storage',
+                'details': 'Please try again later or contact support.'
+            }), 500
         
     except Exception as e:
         logger.error(f"Error uploading business document: {e}")
@@ -1982,44 +2098,48 @@ def upload_enquiry_business_document(enquiry_id):
         if file_size > 10 * 1024 * 1024:  # 10MB
             return jsonify({'error': 'File size must be less than 10MB'}), 400
         
-        # Create uploads directory if it doesn't exist
-        upload_dir = os.path.join(os.getcwd(), 'uploads', 'business_documents')
-        os.makedirs(upload_dir, exist_ok=True)
+        # Check if Cloudinary is available
+        if not CLOUDINARY_AVAILABLE or not CLOUDINARY_ENABLED:
+            return jsonify({
+                'error': 'Document upload service unavailable. Cloudinary is required for document storage.',
+                'details': 'Please contact administrator to enable Cloudinary service.'
+            }), 503
         
-        # Generate unique filename
-        unique_filename = f"enquiry_{enquiry_id}_{uuid.uuid4()}_{secure_filename(file.filename)}"
-        file_path = os.path.join(upload_dir, unique_filename)
-        
-        # Save file
-        file.save(file_path)
-        
-        # Return file URL with server base URL
-        base_url = request.url_root.rstrip('/')
-        file_url = f"{base_url}/uploads/business_documents/{unique_filename}"
-        
-        # Update enquiry with business document URL
-        result = enquiries_collection.update_one(
-            {'_id': ObjectId(enquiry_id)},
-            {
-                '$set': {
-                    'business_document_url': file_url,
-                    'updated_at': datetime.utcnow()
+        try:
+            # Upload to Cloudinary
+            uploaded_file = upload_to_cloudinary_enquiry(file, enquiry_id, 'business_document')
+            
+            # Update enquiry with business document URL
+            result = enquiries_collection.update_one(
+                {'_id': ObjectId(enquiry_id)},
+                {
+                    '$set': {
+                        'business_document_url': uploaded_file['url'],
+                        'business_document_public_id': uploaded_file['public_id'],
+                        'updated_at': datetime.utcnow()
+                    }
                 }
-            }
-        )
-        
-        if result.matched_count == 0:
-            # Clean up uploaded file if enquiry not found
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            return jsonify({'error': 'Enquiry not found'}), 404
-        
-        logger.info(f"Business document uploaded for enquiry {enquiry_id}: {unique_filename}")
-        return jsonify({
-            'success': True,
-            'business_document_url': file_url,
-            'filename': unique_filename
-        }), 200
+            )
+            
+            if result.matched_count == 0:
+                return jsonify({'error': 'Enquiry not found'}), 404
+            
+            logger.info(f"Business document uploaded for enquiry {enquiry_id}: {uploaded_file['public_id']}")
+            return jsonify({
+                'success': True,
+                'business_document_url': uploaded_file['url'],
+                'filename': uploaded_file['original_filename'],
+                'public_id': uploaded_file['public_id'],
+                'format': uploaded_file['format'],
+                'bytes': uploaded_file['bytes']
+            }), 200
+            
+        except Exception as upload_error:
+            logger.error(f"Error uploading to Cloudinary for enquiry {enquiry_id}: {str(upload_error)}")
+            return jsonify({
+                'error': 'Failed to upload document to cloud storage',
+                'details': 'Please try again later or contact support.'
+            }), 500
         
     except Exception as e:
         logger.error(f"Error uploading business document for enquiry {enquiry_id}: {e}")
