@@ -191,12 +191,12 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
         
         print(f"📤 Document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
         print(f"🔗 Cloudinary URL: {result['secure_url']}")
-        print(f"📊 File size: {result['bytes']} bytes, Format: {result['format']}")
+        print(f"📊 File size: {result['bytes']} bytes, Format: {result.get('format', file_extension)}")
         
         return {
             'url': result['secure_url'],
             'public_id': result['public_id'],
-            'format': result['format'],
+            'format': result.get('format', file_extension),  # Use file extension if format not available (raw uploads)
             'bytes': result['bytes'],
             'original_filename': original_filename,
             'storage_type': 'cloudinary',
@@ -302,7 +302,7 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
         return {
             'url': result['secure_url'],
             'public_id': result['public_id'],
-            'format': result['format'],
+            'format': result.get('format', 'pdf' if is_pdf_document else 'unknown'),  # Use 'pdf' if format not available for PDF uploads
             'bytes': result['bytes'],
             'original_filename': 'business_document',
             'storage_type': 'cloudinary',
