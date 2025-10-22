@@ -71,6 +71,35 @@ try:
 except Exception as e:
     print(f"❌ Other imports failed: {e}")
 
+# Test enquiry_routes import
+print("\n=== TESTING ENQUIRY_ROUTES IMPORT ===")
+try:
+    print("Attempting to import enquiry_routes...")
+    import enquiry_routes
+    print("✅ enquiry_routes imported successfully")
+    
+    if hasattr(enquiry_routes, 'enquiry_bp'):
+        print(f"✅ enquiry_bp found: {enquiry_routes.enquiry_bp}")
+        print(f"Blueprint name: {enquiry_routes.enquiry_bp.name}")
+        
+        # Check if upload_business_document function exists
+        if hasattr(enquiry_routes, 'upload_business_document'):
+            print(f"✅ upload_business_document function found")
+        else:
+            print("❌ upload_business_document function not found")
+            
+        # List all routes in the blueprint
+        print(f"Routes in blueprint: {[rule.rule for rule in enquiry_routes.enquiry_bp.url_map.iter_rules()]}")
+    else:
+        print("❌ enquiry_bp not found in module")
+        
+except ImportError as e:
+    print(f"❌ ImportError: {e}")
+    print(f"Traceback: {traceback.format_exc()}")
+except Exception as e:
+    print(f"❌ Unexpected error: {e}")
+    print(f"Traceback: {traceback.format_exc()}")
+
 # Test client_routes import
 print("\n=== TESTING CLIENT_ROUTES IMPORT ===")
 try:

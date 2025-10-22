@@ -136,7 +136,7 @@ else:
         clients_collection = None
         users_collection = None
 
-def upload_to_cloudinary(file, client_id, doc_type):
+def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_name=None):
     """Upload file to Cloudinary cloud storage"""
     try:
         if not CLOUDINARY_AVAILABLE:
@@ -151,10 +151,20 @@ def upload_to_cloudinary(file, client_id, doc_type):
         original_filename = secure_filename(file.filename)
         unique_filename = f"{doc_type}_{original_filename}"
         
+        # Create folder path based on trade name and business name if available
+        if trade_name and business_name:
+            # Sanitize folder names for Cloudinary
+            safe_trade_name = secure_filename(trade_name).replace('_', '-')
+            safe_business_name = secure_filename(business_name).replace('_', '-')
+            folder_path = f"tmis-business-guru/clients/{safe_trade_name}/{safe_business_name}"
+        else:
+            # Fallback to client_id if names not available
+            folder_path = f"tmis-business-guru/clients/{client_id}"
+        
         # Upload to Cloudinary
         result = cloudinary.uploader.upload(
             file,
-            folder=f"tmis-business-guru/clients/{client_id}",
+            folder=folder_path,
             public_id=unique_filename,
             resource_type="auto",  # Automatically detect file type (image, pdf, etc.)
             use_filename=True,
@@ -398,7 +408,10 @@ def create_client():
                         print(f"👤 Regular user - uploading {file.filename} to Cloudinary")
                     
                     print(f"☁️ Uploading {file.filename} to Cloudinary...")
-                    uploaded_file = upload_to_cloudinary(file, client_id, field_name)
+                    # Get trade_name and business_name from form data for folder structure
+                    trade_name = data.get('trade_name', '')
+                    business_name = data.get('business_name', '')
+                    uploaded_file = upload_to_cloudinary(file, client_id, field_name, trade_name, business_name)
                     uploaded_files[field_name] = uploaded_file
                     print(f"✅ Successfully uploaded {file.filename} to Cloudinary")
                     
@@ -410,7 +423,7 @@ def create_client():
                     try:
                         # Reset file pointer and try again
                         file.seek(0)
-                        uploaded_file = upload_to_cloudinary(file, client_id, field_name)
+                        uploaded_file = upload_to_cloudinary(file, client_id, field_name, trade_name, business_name)
                         uploaded_files[field_name] = uploaded_file
                         print(f"✅ Retry successful - uploaded {file.filename} to Cloudinary")
                     except Exception as retry_error:
@@ -1461,7 +1474,10 @@ def update_client_details(client_id):
                             print(f"👤 Regular user - uploading {file.filename} to Cloudinary")
                         
                         print(f"☁️ Uploading {file.filename} to Cloudinary...")
-                        uploaded_file = upload_to_cloudinary(file, client_id, key)
+                        # Get trade_name and business_name from form data or existing client data
+                        trade_name = data.get('trade_name') or client.get('trade_name', '')
+                        business_name = data.get('business_name') or client.get('business_name', '')
+                        uploaded_file = upload_to_cloudinary(file, client_id, key, trade_name, business_name)
                         documents[key] = uploaded_file
                         print(f"✅ Successfully uploaded {file.filename} to Cloudinary")
                         
@@ -1473,7 +1489,7 @@ def update_client_details(client_id):
                         try:
                             # Reset file pointer and try again
                             file.seek(0)
-                            uploaded_file = upload_to_cloudinary(file, client_id, key)
+                            uploaded_file = upload_to_cloudinary(file, client_id, key, trade_name, business_name)
                             documents[key] = uploaded_file
                             print(f"✅ Retry successful - uploaded {file.filename} to Cloudinary")
                         except Exception as retry_error:

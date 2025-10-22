@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from pymongo import MongoClient
 from bson import ObjectId
 from datetime import datetime, timedelta
-import os
 import logging
-import time
+import os
+import uuid
+from werkzeug.utils import secure_filename
+from flask_jwt_extended import jwt_required, get_jwt_identity
+# WhatsApp service will be imported below
+from pymongo import MongoClient
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -279,6 +281,112 @@ def test_connection():
             'message': f'Database test failed: {str(e)}'
         }), 500
 
+@enquiry_bp.route('/enquiries', methods=['POST'])
+@jwt_required()
+def create_enquiry():
+    """Create a new enquiry (admin/staff route with JWT required)"""
+    try:
+        # Check if database is available
+        if db is None or enquiries_collection is None:
+            return jsonify({
+                'error': 'Database not available'
+            }), 500
+        
+        current_user = get_jwt_identity()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Extract data from request
+        wati_name = data.get('wati_name', '').strip()
+        business_name = data.get('business_name', '').strip()
+        owner_name = data.get('owner_name', '').strip()
+        email_address = data.get('email_address', '').strip()
+        phone_number = data.get('phone_number', '').strip()
+        mobile_number = data.get('mobile_number', '').strip()
+        loan_amount = data.get('loan_amount', '').strip()
+        loan_purpose = data.get('loan_purpose', '').strip()
+        annual_revenue = data.get('annual_revenue', '').strip()
+        business_document_url = data.get('business_document_url', '').strip()
+        business_nature = data.get('business_nature', '').strip()
+        business_type = data.get('business_type', '').strip()
+        staff = data.get('staff', '')
+        comments = data.get('comments', '')
+        gst = data.get('gst', '')
+        gst_status = data.get('gst_status', '')
+        secondary_mobile_number = data.get('secondary_mobile_number', '')
+        
+        # Use appropriate name field for validation
+        name_field = owner_name or wati_name
+        phone_field = phone_number or mobile_number
+        
+        if not name_field or not phone_field:
+            return jsonify({'error': 'Name and phone number are required'}), 400
+        
+        # Clean mobile number - extract last 10 digits to handle various formats
+        all_digits = ''.join(filter(str.isdigit, phone_field))
+        clean_number = all_digits[-10:] if len(all_digits) >= 10 else all_digits
+        
+        # Validate that we have a 10-digit mobile number
+        if len(clean_number) != 10:
+            return jsonify({'error': 'Please enter a valid 10-digit mobile number'}), 400
+        
+        # Check if mobile number already exists
+        existing_enquiry = enquiries_collection.find_one({'mobile_number': clean_number})
+        if existing_enquiry:
+            return jsonify({
+                'error': 'Mobile number already exists',
+                'existing_enquiry_id': str(existing_enquiry['_id'])
+            }), 409
+        
+        # Create enquiry record
+        new_enquiry = {
+            'date': datetime.utcnow(),
+            'wati_name': wati_name or owner_name,
+            'owner_name': owner_name,
+            'business_name': business_name,
+            'email_address': email_address,
+            'phone_number': phone_number or mobile_number,
+            'mobile_number': clean_number,
+            'loan_amount': loan_amount,
+            'loan_purpose': loan_purpose,
+            'annual_revenue': annual_revenue,
+            'business_document_url': business_document_url,
+            'secondary_mobile_number': secondary_mobile_number or None,
+            'gst': gst,
+            'gst_status': gst_status,
+            'business_type': business_type,
+            'business_nature': business_nature,
+            'staff': staff,
+            'comments': comments,
+            'additional_comments': '',
+            'whatsapp_status': 'pending',
+            'whatsapp_sent': False,
+            'source': 'admin_form',
+            'staff_locked': False,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow(),
+            'created_by': current_user
+        }
+        
+        # Insert into database
+        result = enquiries_collection.insert_one(new_enquiry)
+        new_enquiry['_id'] = str(result.inserted_id)
+        
+        logger.info(f"Created enquiry for {name_field} ({clean_number}) by user {current_user}")
+        
+        # Serialize enquiry for response
+        serialized_enquiry = serialize_enquiry(new_enquiry)
+        
+        return jsonify(serialized_enquiry), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating enquiry: {str(e)}")
+        return jsonify({
+            'error': f'Failed to create enquiry: {str(e)}'
+        }), 500
+
 @enquiry_bp.route('/enquiries/public', methods=['POST'])
 def create_public_enquiry():
     """Create a new enquiry from public form (no JWT required)"""
@@ -294,19 +402,47 @@ def create_public_enquiry():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        # Extract enquiry data
-        wati_name = data.get('wati_name', '')
-        mobile_number = data.get('mobile_number', '')
-        business_type = data.get('business_type', '')
-        business_nature = data.get('business_nature', '')
+        # Debug logging
+        logger.info(f"Received public enquiry data: {data}")
+        
+        # Extract data from request
+        wati_name = data.get('wati_name', '').strip()
+        business_name = data.get('business_name', '').strip()
+        owner_name = data.get('owner_name', '').strip()
+        email_address = data.get('email_address', '').strip()
+        phone_number = data.get('phone_number', '').strip()
+        mobile_number = data.get('mobile_number', '').strip()
+        loan_amount = data.get('loan_amount', '').strip()
+        loan_purpose = data.get('loan_purpose', '').strip()
+        annual_revenue = data.get('annual_revenue', '').strip()
+        business_document_url = data.get('business_document_url', '').strip()
+        business_nature = data.get('business_nature', '').strip()  # Keep for backward compatibility
+        staff = data.get('staff', 'Public Enquiry')
+        comments = data.get('comments', 'New Public Enquiry')
         gst = data.get('gst', '')
+        secondary_mobile_number = data.get('secondary_mobile_number', '')
+
+        # Use owner_name or wati_name for validation
+        name_field = owner_name or wati_name
+        phone_field = phone_number or mobile_number
         
-        # Validate required fields
-        if not wati_name or not mobile_number:
-            return jsonify({'error': 'Name and mobile number are required'}), 400
+        if not name_field or not phone_field:
+            return jsonify({'error': 'Name and phone number are required'}), 400
         
-        # Clean mobile number
-        clean_number = ''.join(filter(str.isdigit, mobile_number))
+        # Clean mobile number (use phone_field which contains the actual number)
+        # Extract only digits and take last 10 digits to handle various formats:
+        # +919876543210 -> 9876543210
+        # 919876543210 -> 9876543210  
+        # 09876543210 -> 9876543210
+        # 9876543210 -> 9876543210
+        all_digits = ''.join(filter(str.isdigit, phone_field))
+        clean_number = all_digits[-10:] if len(all_digits) >= 10 else all_digits
+        
+        # Validate that we have a 10-digit mobile number
+        if len(clean_number) != 10:
+            return jsonify({'error': 'Please enter a valid 10-digit mobile number'}), 400
+        
+        logger.info(f"Original phone input: {phone_field} -> Cleaned: {clean_number}")
         
         # Check if mobile number already exists
         existing_enquiry = enquiries_collection.find_one({'mobile_number': clean_number})
@@ -359,19 +495,27 @@ def create_public_enquiry():
         # Create enquiry record
         new_enquiry = {
             'date': datetime.utcnow(),
-            'wati_name': wati_name,
+            'wati_name': wati_name or owner_name,  # Use owner_name if wati_name is empty
+            'owner_name': owner_name,
+            'business_name': business_name,
+            'email_address': email_address,
+            'phone_number': phone_number or mobile_number,
             'mobile_number': clean_number,
+            'loan_amount': loan_amount,
+            'loan_purpose': loan_purpose,
+            'annual_revenue': annual_revenue,
+            'business_document_url': business_document_url,
             'secondary_mobile_number': None,
             'gst': gst,
             'gst_status': '',
-            'business_type': business_type,
-            'business_nature': business_nature,
+            'business_type': '',  # Keep empty for new form
+            'business_nature': business_nature,  # Keep for backward compatibility
             'staff': 'Public Form',
-            'comments': 'New Enquiry - Public Form',
+            'comments': 'New Enquiry - FinGrowth Form',
             'additional_comments': '',
             'whatsapp_status': 'pending',
             'whatsapp_sent': False,
-            'source': 'public_form',
+            'source': 'public_form_fingrowth',
             'staff_locked': False,  # Keep unlocked for public forms
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
@@ -382,6 +526,7 @@ def create_public_enquiry():
         new_enquiry['_id'] = str(result.inserted_id)
         
         logger.info(f"Created public enquiry for {wati_name} ({clean_number})")
+        logger.info(f"Stored enquiry data: business_name={business_name}, loan_amount={loan_amount}, loan_purpose={loan_purpose}, email_address={email_address}")
         
         # Send WhatsApp welcome message
         whatsapp_result = None
@@ -1346,9 +1491,10 @@ def update_enquiry(enquiry_id):
         
         # Add fields to update
         updatable_fields = [
-            'date', 'wati_name', 'user_name', 'mobile_number', 
-            'secondary_mobile_number', 'gst', 'gst_status', 
-            'business_type', 'business_nature', 'staff', 'comments', 'additional_comments'
+            'date', 'wati_name', 'owner_name', 'user_name', 'mobile_number', 
+            'phone_number', 'email_address', 'secondary_mobile_number', 'gst', 'gst_status', 
+            'business_type', 'business_name', 'business_nature', 'loan_amount', 'loan_purpose', 
+            'annual_revenue', 'business_document_url', 'staff', 'comments', 'additional_comments'
         ]
         
         for field in updatable_fields:
@@ -1750,4 +1896,57 @@ def delete_enquiry(enquiry_id):
         
     except Exception as e:
         logger.error(f"Error deleting enquiry {enquiry_id}: {e}")
-        return jsonify({'error': 'Failed to delete enquiry'}), 500
+        return jsonify({'error': 'Internal server error'}), 500
+
+@enquiry_bp.route('/upload-document', methods=['POST'])
+def upload_business_document():
+    """Upload business document file (no JWT required for public form)"""
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_extension not in allowed_extensions:
+            return jsonify({'error': 'Invalid file type. Only PDF, JPG, PNG, DOC, and DOCX files are allowed'}), 400
+        
+        # Validate file size (5MB max)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > 5 * 1024 * 1024:  # 5MB
+            return jsonify({'error': 'File size must be less than 5MB'}), 400
+        
+        # Create uploads directory if it doesn't exist
+        upload_dir = os.path.join(os.getcwd(), 'uploads', 'business_documents')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        # Save file
+        file.save(file_path)
+        
+        # Return file URL with server base URL
+        base_url = request.url_root.rstrip('/')
+        file_url = f"{base_url}/uploads/business_documents/{unique_filename}"
+        
+        logger.info(f"Business document uploaded successfully: {unique_filename}")
+        return jsonify({
+            'success': True,
+            'file_url': file_url,
+            'filename': unique_filename
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error uploading business document: {e}")
+        return jsonify({'error': 'Internal server error'}), 500

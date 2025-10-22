@@ -2212,6 +2212,19 @@ except Exception as e:
                 'fallback': True
             }), 500
 
+# Static file serving for uploaded documents
+from flask import send_from_directory
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    try:
+        upload_dir = os.path.join(os.getcwd(), 'uploads')
+        return send_from_directory(upload_dir, filename)
+    except Exception as e:
+        print(f"Error serving file {filename}: {e}")
+        return jsonify({'error': 'File not found'}), 404
+
 # Export app for main.py to use
 
 # Register blueprints at the end of the file
