@@ -1366,7 +1366,9 @@ def get_client_details(client_id):
             for doc_type, file_info in client['documents'].items():
                 if isinstance(file_info, dict) and file_info.get('storage_type') == 'cloudinary':
                     # Replace the complex object with just the URL for simple access
-                    client['documents'][doc_type] = file_info['url']
+                    # BUT preserve business_document as full object for proper handling
+                    if doc_type != 'business_document':
+                        client['documents'][doc_type] = file_info['url']
         
         return jsonify({'client': client}), 200
         
