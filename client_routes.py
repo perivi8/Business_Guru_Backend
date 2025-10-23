@@ -161,33 +161,19 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
             # Fallback to client_id if names not available
             folder_path = f"tmis-business-guru/clients/{client_id}"
         
-        # Determine resource type based on file extension to preserve PDF format
+        # Upload ALL files as raw to preserve original format and prevent any transformations
         file_extension = original_filename.lower().split('.')[-1] if '.' in original_filename else ''
         
-        if file_extension == 'pdf':
-            # Upload PDFs as raw files to preserve format
-            result = cloudinary.uploader.upload(
-                file,
-                folder=folder_path,
-                public_id=unique_filename,
-                resource_type="raw",  # Use raw for PDFs to preserve format
-                use_filename=True,
-                unique_filename=True,
-                overwrite=False
-            )
-        else:
-            # Upload images and other files normally
-            result = cloudinary.uploader.upload(
-                file,
-                folder=folder_path,
-                public_id=unique_filename,
-                resource_type="auto",  # Auto detect for non-PDF files
-                use_filename=True,
-                unique_filename=True,
-                overwrite=False,
-                quality="auto",  # Automatic quality optimization for images
-                fetch_format="auto"  # Automatic format optimization for images
-            )
+        # Upload all files as raw files to preserve original format
+        result = cloudinary.uploader.upload(
+            file,
+            folder=folder_path,
+            public_id=unique_filename,
+            resource_type="raw",  # Use raw for ALL files to preserve original format
+            use_filename=True,
+            unique_filename=True,
+            overwrite=False
+        )
         
         print(f"📤 Document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
         print(f"🔗 Cloudinary URL: {result['secure_url']}")
@@ -207,7 +193,7 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
         print(f"❌ Error uploading to Cloudinary: {str(e)}")
         raise
 
-def delete_from_cloudinary(public_id, resource_type="auto"):
+def delete_from_cloudinary(public_id, resource_type="raw"):
     """Delete file from Cloudinary with enhanced resource type detection"""
     try:
         if not CLOUDINARY_AVAILABLE:
@@ -219,8 +205,8 @@ def delete_from_cloudinary(public_id, resource_type="auto"):
         
         print(f"🗑️ Attempting to delete from Cloudinary: {public_id}")
         
-        # Try different resource types if auto doesn't work
-        resource_types_to_try = ["auto", "image", "raw", "video"]
+        # Try different resource types, prioritizing raw since we now upload everything as raw
+        resource_types_to_try = ["raw", "auto", "image", "video"]
         
         for res_type in resource_types_to_try:
             try:
@@ -268,33 +254,16 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
         # Generate unique filename for the copied document
         unique_filename = f"business_document_{client_id}"
         
-        # Determine if source document is PDF from URL
-        is_pdf_document = enquiry_document_url.lower().endswith('.pdf') or 'pdf' in enquiry_document_url.lower()
-        
-        if is_pdf_document:
-            # Upload PDFs as raw files to preserve format
-            result = cloudinary.uploader.upload(
-                enquiry_document_url,
-                folder=folder_path,
-                public_id=unique_filename,
-                resource_type="raw",  # Use raw for PDFs to preserve format
-                use_filename=False,
-                unique_filename=True,
-                overwrite=False
-            )
-        else:
-            # Upload other files normally
-            result = cloudinary.uploader.upload(
-                enquiry_document_url,
-                folder=folder_path,
-                public_id=unique_filename,
-                resource_type="auto",
-                use_filename=False,
-                unique_filename=True,
-                overwrite=False,
-                quality="auto",
-                fetch_format="auto"
-            )
+        # Upload ALL files as raw to preserve original format and prevent any transformations
+        result = cloudinary.uploader.upload(
+            enquiry_document_url,
+            folder=folder_path,
+            public_id=unique_filename,
+            resource_type="raw",  # Use raw for ALL files to preserve original format
+            use_filename=False,
+            unique_filename=True,
+            overwrite=False
+        )
         
         print(f"✅ Business document copied to client folder: {result['public_id']}")
         print(f"🔗 New Cloudinary URL: {result['secure_url']}")
@@ -302,7 +271,7 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
         return {
             'url': result['secure_url'],
             'public_id': result['public_id'],
-            'format': result.get('format', 'pdf' if is_pdf_document else 'unknown'),  # Use 'pdf' if format not available for PDF uploads
+            'format': result.get('format', 'unknown'),  # Format will be determined by file content
             'bytes': result['bytes'],
             'original_filename': 'business_document',
             'storage_type': 'cloudinary',
