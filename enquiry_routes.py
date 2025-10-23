@@ -199,19 +199,34 @@ def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
         # Create folder path for enquiry documents
         folder_path = f"tmis-business-guru/enquiries/{enquiry_id}"
         
-        # Upload ALL files as raw to preserve original format and prevent any transformations
+        # Smart upload strategy: use auto for PDFs (to allow preview) but without transformations
         file_extension = original_filename.lower().split('.')[-1] if '.' in original_filename else ''
         
-        # Upload all files as raw files to preserve original format
-        result = cloudinary.uploader.upload(
-            file,
-            folder=folder_path,
-            public_id=unique_filename,
-            resource_type="raw",  # Use raw for ALL files to preserve original format
-            use_filename=True,
-            unique_filename=True,
-            overwrite=False
-        )
+        if file_extension == 'pdf':
+            # Upload PDFs as auto to allow preview, with public access control
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="auto",  # Use auto for PDFs to allow preview
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False,
+                access_mode="public",  # Ensure public access for delivery
+                type="upload",  # Explicit upload type
+                # No quality or format transformations to preserve original PDF
+            )
+        else:
+            # Upload other files as raw to preserve original format
+            result = cloudinary.uploader.upload(
+                file,
+                folder=folder_path,
+                public_id=unique_filename,
+                resource_type="raw",  # Use raw for non-PDF files
+                use_filename=True,
+                unique_filename=True,
+                overwrite=False
+            )
         
         print(f"📤 Enquiry document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
         print(f"🔗 Cloudinary URL: {result['secure_url']}")
