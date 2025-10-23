@@ -212,8 +212,10 @@ def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
                 use_filename=True,
                 unique_filename=True,
                 overwrite=False,
-                access_mode="public",  # Ensure public access for delivery
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for delivery
                 type="upload",  # Explicit upload type
+                # Additional parameters for PDF delivery
+                invalidate=True,  # Invalidate CDN cache
                 # No quality or format transformations to preserve original PDF
             )
         else:
@@ -225,7 +227,9 @@ def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
                 resource_type="raw",  # Use raw for non-PDF files
                 use_filename=True,
                 unique_filename=True,
-                overwrite=False
+                overwrite=False,
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for all files
+                invalidate=True,  # Invalidate CDN cache
             )
         
         print(f"📤 Enquiry document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")

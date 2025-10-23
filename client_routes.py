@@ -174,8 +174,9 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
                 use_filename=True,
                 unique_filename=True,
                 overwrite=False,
-                access_mode="public",  # Ensure public access for delivery
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for delivery
                 type="upload",  # Explicit upload type
+                invalidate=True,  # Invalidate CDN cache
                 # No quality or format transformations to preserve original PDF
             )
         else:
@@ -187,7 +188,9 @@ def upload_to_cloudinary(file, client_id, doc_type, trade_name=None, business_na
                 resource_type="raw",  # Use raw for non-PDF files
                 use_filename=True,
                 unique_filename=True,
-                overwrite=False
+                overwrite=False,
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for all files
+                invalidate=True,  # Invalidate CDN cache
             )
         
         print(f"📤 Document uploaded to Cloudinary: {doc_type} -> {result['public_id']}")
@@ -282,8 +285,9 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
                 use_filename=False,
                 unique_filename=True,
                 overwrite=False,
-                access_mode="public",  # Ensure public access for delivery
-                type="upload"  # Explicit upload type
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for delivery
+                type="upload",  # Explicit upload type
+                invalidate=True,  # Invalidate CDN cache
             )
         else:
             # Upload other files as raw to preserve original format
@@ -294,7 +298,9 @@ def copy_business_document_to_client_folder(enquiry_document_url, client_id, tra
                 resource_type="raw",  # Use raw for non-PDF files
                 use_filename=False,
                 unique_filename=True,
-                overwrite=False
+                overwrite=False,
+                access_control=[{"access_type": "anonymous"}],  # Ensure public access for all files
+                invalidate=True,  # Invalidate CDN cache
             )
         
         print(f"✅ Business document copied to client folder: {result['public_id']}")
