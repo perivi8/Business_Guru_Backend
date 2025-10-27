@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: tmis-business-guru-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start_server.py
+    envVars:
+      # IMPORTANT: Set these in Render Dashboard, NOT in this file
+      # Dashboard -> Environment -> Environment Variables
+      
+      - key: MONGODB_URI
+        sync: false  # Set in Render dashboard
+      
+      - key: JWT_SECRET_KEY
+        sync: false  # Set in Render dashboard - use cryptographically random 256-bit secret
+      
+      - key: FLASK_ENV
+        value: production
+      
+      - key: UPLOAD_FOLDER
+        value: uploads
+      
+      - key: SMTP_EMAIL
+        sync: false  # Set in Render dashboard
+      
+      - key: SMTP_PASSWORD
+        sync: false  # Set in Render dashboard
+      
+      - key: SMTP_SERVER
+        value: smtp-relay.brevo.com
+      
+      - key: SMTP_PORT
+        value: 587
+      
+      - key: CLOUDINARY_ENABLED
+        value: true
+      
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false  # Set in Render dashboard
+      
+      - key: CLOUDINARY_API_KEY
+        sync: false  # Set in Render dashboard
+      
+      - key: CLOUDINARY_API_SECRET
+        sync: false  # Set in Render dashboard
+      
+      - key: BREVO_API_KEY
+        sync: false  # Set in Render dashboard
+      
+      - key: BREVO_FROM_EMAIL
+        sync: false  # Set in Render dashboard
+      
+      - key: BREVO_FROM_NAME
+        value: "TMIS Business Guru"

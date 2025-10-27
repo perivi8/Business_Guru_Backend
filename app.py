@@ -2235,14 +2235,6 @@ try:
 except Exception as e:
     print(f"❌ Failed to register enquiry blueprint: {e}")
 
-# Register chatbot blueprint
-try:
-    from chatbot_routes import chatbot_bp
-    app.register_blueprint(chatbot_bp)
-    print("✅ Chatbot blueprint registered successfully")
-except Exception as e:
-    print(f"❌ Failed to register chatbot blueprint: {e}")
-
 # Register optimized status routes blueprint
 try:
     from optimized_status_routes import status_bp

@@ -4,6 +4,10 @@
 .env.production
 .env.staging
 
+# Deployment configuration with secrets
+render.yaml
+render.yaml.backup
+
 # Python
 __pycache__/
 *.py[cod]
