@@ -1285,6 +1285,11 @@ def get_client_details(client_id):
         print(f"   Value: {client.get('payment_gateways')}")
         print(f"   Raw client keys: {list(client.keys())}")
         
+        # Debug IE Code Number
+        print(f"🔍 Client {client_id} ie_code_number data:")
+        print(f"   Value: '{client.get('ie_code_number', 'NOT_PRESENT')}'")
+        print(f"   Type: {type(client.get('ie_code_number'))}")
+        
         # Process document paths to be accessible
         if 'documents' in client:
             processed_documents = {}
@@ -1470,12 +1475,24 @@ def update_client_details(client_id):
             # Create update data dictionary
             update_data = {}
             
+            # Debug: Log all incoming data keys
+            print(f"🔍 Incoming FormData keys: {list(data.keys())}")
+            print(f"🔍 ie_code_number in data: {'ie_code_number' in data}")
+            if 'ie_code_number' in data:
+                print(f"🔍 ie_code_number value from FormData: '{data['ie_code_number']}'")
+            
+            # CRITICAL FIX: Explicitly handle ie_code_number to ensure it's always processed
+            if 'ie_code_number' in data:
+                ie_code_value = data.get('ie_code_number', '')
+                update_data['ie_code_number'] = ie_code_value
+                print(f"🔧 EXPLICIT FIX: Forcefully setting ie_code_number = '{ie_code_value}'")
+            
             # Update text fields
             text_fields = [
                 'legal_name', 'trade_name', 'user_name', 'user_email', 'email',
                 'company_email', 'optional_mobile_number',
                 'mobile_number', 'business_name', 'business_type', 'constitution_type',
-                'gst_number', 'gst_status', 'business_pan', 'ie_code', 'website',
+                'gst_number', 'gst_status', 'business_pan', 'ie_code', 'ie_code_number', 'website',
                 'address', 'district', 'state', 'pincode', 'business_address',
                 'bank_name', 'account_name', 'account_number', 'ifsc_code', 'account_type',
                 'bank_type', 'new_current_account', 'gateway', 'loan_purpose',
@@ -1514,6 +1531,9 @@ def update_client_details(client_id):
                             print(f"⚠️ Failed to parse payment_gateways_status JSON: {data[field]}")
                     else:
                         update_data[field] = data[field]
+                        # Debug logging for ie_code_number
+                        if field == 'ie_code_number':
+                            print(f"🔍 IE Code Number update - Value: '{data[field]}', Type: {type(data[field])}")
                 elif field == 'payment_gateways':
                     # If payment_gateways is not in the data, preserve existing values
                     # This prevents accidental clearing of payment gateways from non-gateway editing components
@@ -1616,6 +1636,88 @@ def update_client_details(client_id):
             if documents:
                 update_data['documents'] = documents
             
+            # Handle product images upload
+            product_images = []
+            if 'product_images' in files:
+                product_image_files = request.files.getlist('product_images')
+                print(f"📸 Processing {len(product_image_files)} product images")
+                for idx, image_file in enumerate(product_image_files):
+                    if image_file and image_file.filename:
+                        try:
+                            print(f"☁️ Uploading product image {idx + 1} to Cloudinary...")
+                            trade_name = data.get('trade_name') or client.get('trade_name', '')
+                            business_name = data.get('business_name') or client.get('business_name', '')
+                            uploaded_image = upload_to_cloudinary(image_file, client_id, f'product_image_{idx}', trade_name, business_name)
+                            product_images.append(uploaded_image)
+                            print(f"✅ Successfully uploaded product image {idx + 1}")
+                        except Exception as e:
+                            print(f"❌ Error uploading product image {idx + 1}: {str(e)}")
+                
+                # Merge with existing product images
+                existing_product_images = client.get('product_images', [])
+                if existing_product_images:
+                    product_images = existing_product_images + product_images
+                
+                update_data['product_images'] = product_images
+                print(f"✅ Total product images: {len(product_images)}")
+            
+            # Handle user photos upload
+            user_photos = []
+            if 'user_photos' in files:
+                user_photo_files = request.files.getlist('user_photos')
+                print(f"👤 Processing {len(user_photo_files)} user photos")
+                for idx, photo_file in enumerate(user_photo_files):
+                    if photo_file and photo_file.filename:
+                        try:
+                            print(f"☁️ Uploading user photo {idx + 1} to Cloudinary...")
+                            trade_name = data.get('trade_name') or client.get('trade_name', '')
+                            business_name = data.get('business_name') or client.get('business_name', '')
+                            uploaded_photo = upload_to_cloudinary(photo_file, client_id, f'user_photo_{idx}', trade_name, business_name)
+                            user_photos.append(uploaded_photo)
+                            print(f"✅ Successfully uploaded user photo {idx + 1}")
+                        except Exception as e:
+                            print(f"❌ Error uploading user photo {idx + 1}: {str(e)}")
+                
+                # Merge with existing user photos
+                existing_user_photos = client.get('user_photos', [])
+                if existing_user_photos:
+                    user_photos = existing_user_photos + user_photos
+                
+                update_data['user_photos'] = user_photos
+                print(f"✅ Total user photos: {len(user_photos)}")
+            
+            # Handle deletion of product images
+            if 'delete_product_images' in data:
+                try:
+                    delete_product_images = json.loads(data['delete_product_images'])
+                    if delete_product_images and isinstance(delete_product_images, list):
+                        existing_product_images = client.get('product_images', [])
+                        for public_id in delete_product_images:
+                            # Delete from Cloudinary
+                            delete_from_cloudinary(public_id)
+                            # Remove from list
+                            existing_product_images = [img for img in existing_product_images if img.get('public_id') != public_id]
+                        update_data['product_images'] = existing_product_images
+                        print(f"✅ Deleted {len(delete_product_images)} product images")
+                except Exception as e:
+                    print(f"❌ Error deleting product images: {str(e)}")
+            
+            # Handle deletion of user photos
+            if 'delete_user_photos' in data:
+                try:
+                    delete_user_photos = json.loads(data['delete_user_photos'])
+                    if delete_user_photos and isinstance(delete_user_photos, list):
+                        existing_user_photos = client.get('user_photos', [])
+                        for public_id in delete_user_photos:
+                            # Delete from Cloudinary
+                            delete_from_cloudinary(public_id)
+                            # Remove from list
+                            existing_user_photos = [photo for photo in existing_user_photos if photo.get('public_id') != public_id]
+                        update_data['user_photos'] = existing_user_photos
+                        print(f"✅ Deleted {len(delete_user_photos)} user photos")
+                except Exception as e:
+                    print(f"❌ Error deleting user photos: {str(e)}")
+            
             # Handle deleted documents
             if 'deleted_documents' in data:
                 try:
@@ -1707,11 +1809,20 @@ def update_client_details(client_id):
         if WHATSAPP_SERVICE_AVAILABLE and client_whatsapp_service:
             old_client = clients_collection.find_one({'_id': ObjectId(client_id)})
         
+        # Debug: Log ie_code_number before update
+        print(f"🔍 Before update - ie_code_number in update_data: '{update_data.get('ie_code_number', 'NOT_PRESENT')}'")
+        print(f"🔍 Current client ie_code_number: '{client.get('ie_code_number', 'NOT_PRESENT')}'")
+        
         # Update client
         result = clients_collection.update_one(
             {'_id': ObjectId(client_id)},
             {'$set': update_data}
         )
+        
+        # Debug: Verify the update
+        if 'ie_code_number' in update_data:
+            updated_client = clients_collection.find_one({'_id': ObjectId(client_id)})
+            print(f"✅ After update - ie_code_number in database: '{updated_client.get('ie_code_number', 'NOT_PRESENT')}'")
         
         if result.matched_count == 0:
             return jsonify({'error': 'Client not found'}), 404
