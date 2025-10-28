@@ -111,6 +111,39 @@ cors.init_app(app,
 )
 jwt = JWTManager(app)
 
+# Add security headers to all responses
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    # Content Security Policy - allows CDN resources and source maps
+    csp_policy = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.socket.io; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://business-guru-backend.onrender.com http://localhost:5000 wss: ws: https://cdn.jsdelivr.net https://cdn.socket.io; "
+        "frame-ancestors 'none';"
+    )
+    response.headers['Content-Security-Policy'] = csp_policy
+    
+    # Prevent clickjacking (Note: frame-ancestors in CSP supersedes X-Frame-Options)
+    response.headers['X-Frame-Options'] = 'DENY'
+    
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # Enable XSS protection
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Referrer policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Permissions policy (formerly Feature-Policy)
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    
+    return response
+
 # Handle OPTIONS requests before JWT validation
 @app.before_request
 def handle_preflight():
