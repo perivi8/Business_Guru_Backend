@@ -1585,11 +1585,11 @@ def update_enquiry(enquiry_id):
         if gst_value == 'Yes' and not str(data.get('gst_status', existing_enquiry.get('gst_status', ''))).strip():
             return jsonify({'error': 'GST status is required when GST is Yes'}), 400
         
-        # Validate business_nature if comment is "Not Eligible"
+        # Validate loan_purpose if comment is "Not Eligible"
         if 'comments' in data and data['comments'] == 'Not Eligible':
-            business_nature = data.get('business_nature', existing_enquiry.get('business_nature', ''))
-            if not business_nature or not str(business_nature).strip():
-                return jsonify({'error': 'Business Nature is required when "Not Eligible" comment is selected'}), 400
+            loan_purpose = data.get('loan_purpose', existing_enquiry.get('loan_purpose', ''))
+            if not loan_purpose or not str(loan_purpose).strip():
+                return jsonify({'error': 'Loan Purpose is required when "Not Eligible" comment is selected'}), 400
         
         # Parse date if provided
         if 'date' in data:
@@ -1729,14 +1729,16 @@ def update_enquiry(enquiry_id):
                             else:
                                 serialized_enquiry['whatsapp_debug_error'] = error_msg
                 
-                # Check if staff has been assigned
+                # Check if staff has been assigned or changed
                 if 'staff' in data:
                     new_staff = data['staff']
+                    old_staff = existing_enquiry.get('staff', '')
                     
-                    # Always send staff assignment messages when staff is assigned/changed
-                    # Remove the condition that only sent messages on first assignment
-                    if new_staff and new_staff.strip() != '' and new_staff != 'None':
-                        logger.info(f"Staff assigned/updated to '{new_staff}', sending staff assignment messages")
+                    # Only send staff assignment messages when staff is newly assigned or changed
+                    # Don't send if staff is the same as before
+                    staff_changed = new_staff != old_staff
+                    if new_staff and new_staff.strip() != '' and new_staff != 'None' and staff_changed:
+                        logger.info(f"Staff changed from '{old_staff}' to '{new_staff}', sending staff assignment messages")
                         
                         # Send the three staff assignment messages
                         whatsapp_result = whatsapp_service.send_staff_assignment_messages(

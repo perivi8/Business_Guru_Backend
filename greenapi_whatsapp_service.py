@@ -396,7 +396,7 @@ Thank you! 🚀⭐""",
             
             'not_eligible': """Hii {wati_name} sir/madam! 🙏
 
-Thank you for reaching out to Business Guru. After carefully reviewing your application and business profile for {business_nature}, we regret to inform you that we're unable to provide a loan at this time. Our decision is based on our current lending criteria, risk assessment policies, and internal evaluation process. 
+Thank you for reaching out to Business Guru. After carefully reviewing your application and business profile for {loan_purpose}, we regret to inform you that we're unable to provide a loan at this time. Our decision is based on our current lending criteria, risk assessment policies, and internal evaluation process. 
 
 We appreciate your interest in our services and encourage you to contact us again in the future as our policies may change. 
 
@@ -607,7 +607,7 @@ Working Hours : 10.00AM - 6.00PM"""
             # Format message with enquiry data
             formatted_message = message_template.format(
                 wati_name=enquiry_data.get('wati_name', 'Customer'),
-                business_nature=enquiry_data.get('business_nature', 'your business')
+                loan_purpose=enquiry_data.get('loan_purpose', 'your business')
             )
             
             # Send message
