@@ -181,6 +181,96 @@ def parse_date_safely(date_input):
         logger.error(f"Error parsing date {date_input}: {e}")
         return datetime.now()
 
+def get_active_staff_members():
+    """
+    Get list of active staff members for round-robin assignment.
+    Excludes: Admin role, Public Form, WhatsApp Web, and paused users.
+    Returns staff members sorted alphabetically.
+    """
+    try:
+        if users_collection is None:
+            logger.error("Users collection not available")
+            return []
+        
+        # Query for active users with role 'user' (not admin) and status not paused
+        active_users = users_collection.find({
+            'role': 'user',  # Only regular users, not admins
+            'status': {'$ne': 'paused'}  # Exclude paused users
+        })
+        
+        # Extract usernames/emails and sort alphabetically
+        staff_list = []
+        for user in active_users:
+            staff_name = user.get('username') or user.get('email')
+            if staff_name and staff_name not in ['Admin', 'Public Form', 'WhatsApp Web']:
+                staff_list.append(staff_name)
+        
+        # Sort alphabetically (case-insensitive)
+        staff_list.sort(key=str.lower)
+        
+        logger.info(f"Active staff members for round-robin: {staff_list}")
+        return staff_list
+        
+    except Exception as e:
+        logger.error(f"Error getting active staff members: {e}")
+        return []
+
+def get_next_staff_member_round_robin():
+    """
+    Get the next staff member in round-robin sequence.
+    Counts how many enquiries have been assigned to each staff member
+    and returns the staff member who should receive the next assignment.
+    """
+    try:
+        if enquiries_collection is None:
+            logger.error("Enquiries collection not available")
+            return None
+        
+        # Get list of active staff members
+        active_staff = get_active_staff_members()
+        
+        if not active_staff:
+            logger.warning("No active staff members available for assignment")
+            return None
+        
+        # Count assignments for each staff member (excluding special forms)
+        staff_assignment_count = {}
+        for staff_name in active_staff:
+            staff_assignment_count[staff_name] = 0
+        
+        # Query all enquiries with staff assigned (excluding special forms)
+        assigned_enquiries = enquiries_collection.find({
+            'staff': {
+                '$exists': True,
+                '$nin': ['', 'Public Form', 'WhatsApp Form', 'WhatsApp Bot', 'WhatsApp Web', 'Admin']
+            }
+        })
+        
+        # Count assignments per staff member
+        for enquiry in assigned_enquiries:
+            staff_name = enquiry.get('staff')
+            if staff_name in staff_assignment_count:
+                staff_assignment_count[staff_name] += 1
+        
+        # Find staff member with minimum assignments
+        # If there's a tie, alphabetical order determines priority
+        min_assignments = min(staff_assignment_count.values())
+        next_staff = None
+        
+        for staff_name in active_staff:  # Already sorted alphabetically
+            if staff_assignment_count[staff_name] == min_assignments:
+                next_staff = staff_name
+                break
+        
+        logger.info(f"Round-robin assignment counts: {staff_assignment_count}")
+        logger.info(f"Next staff member for assignment: {next_staff}")
+        
+        return next_staff
+        
+    except Exception as e:
+        logger.error(f"Error getting next staff member: {e}")
+        return None
+
 def upload_to_cloudinary_enquiry(file, enquiry_id, doc_type):
     """Upload file to Cloudinary cloud storage for enquiry documents"""
     try:
@@ -391,6 +481,36 @@ def test_connection():
         return jsonify({
             'status': 'error',
             'message': f'Database test failed: {str(e)}'
+        }), 500
+
+@enquiry_bp.route('/enquiries/next-staff-round-robin', methods=['GET'])
+@jwt_required()
+def get_next_staff_round_robin():
+    """Get the next staff member for round-robin assignment"""
+    try:
+        # Check if database is available
+        if db is None or enquiries_collection is None or users_collection is None:
+            return jsonify({
+                'error': 'Database not available'
+            }), 500
+        
+        # Get active staff members
+        active_staff = get_active_staff_members()
+        
+        # Get next staff member for assignment
+        next_staff = get_next_staff_member_round_robin()
+        
+        return jsonify({
+            'success': True,
+            'next_staff': next_staff,
+            'active_staff_list': active_staff,
+            'total_active_staff': len(active_staff)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting next staff for round-robin: {str(e)}")
+        return jsonify({
+            'error': f'Failed to get next staff: {str(e)}'
         }), 500
 
 @enquiry_bp.route('/enquiries', methods=['POST'])
@@ -1628,14 +1748,32 @@ def update_enquiry(enquiry_id):
         # If so, lock the staff assignment
         if 'staff' in data:
             new_staff = data['staff']
-            if new_staff and new_staff.strip() not in ['Public Form', 'WhatsApp Form', 'WhatsApp Bot', '']:
-                # Lock the staff assignment
+            current_staff = existing_enquiry.get('staff', '')
+            
+            # Check if we're transitioning from a special form to actual staff assignment
+            is_transitioning_from_special_form = current_staff in ['Public Form', 'WhatsApp Form', 'WhatsApp Bot', 'WhatsApp Web', '']
+            
+            # If staff field is being set to 'auto' or empty when transitioning from special form,
+            # automatically assign using round-robin
+            if is_transitioning_from_special_form and (new_staff == 'auto' or new_staff == ''):
+                next_staff = get_next_staff_member_round_robin()
+                if next_staff:
+                    update_doc['staff'] = next_staff
+                    update_doc['staff_locked'] = True
+                    logger.info(f"Round-robin auto-assignment: {next_staff} assigned to enquiry {enquiry_id}")
+                else:
+                    logger.warning(f"No staff available for round-robin assignment for enquiry {enquiry_id}")
+                    # Keep the current staff value if no staff available
+                    if 'staff' in update_doc:
+                        del update_doc['staff']
+            elif new_staff and new_staff.strip() not in ['Public Form', 'WhatsApp Form', 'WhatsApp Bot', 'WhatsApp Web', '', 'auto']:
+                # Manual staff assignment - lock the staff assignment
                 update_doc['staff_locked'] = True
-                logger.info(f"Staff assigned: {new_staff}. Locking staff assignment.")
+                logger.info(f"Staff manually assigned: {new_staff}. Locking staff assignment.")
                 
                 # Log staff assignment for tracking
                 logger.info(f"Staff assignment completed for enquiry {enquiry_id}. This may unlock staff assignments for new enquiries.")
-            elif new_staff and new_staff.strip() in ['Public Form', 'WhatsApp Form', 'WhatsApp Bot']:
+            elif new_staff and new_staff.strip() in ['Public Form', 'WhatsApp Form', 'WhatsApp Bot', 'WhatsApp Web']:
                 # Keep unlocked for public/whatsapp forms
                 update_doc['staff_locked'] = False
                 logger.info(f"Public/WhatsApp form staff assigned: {new_staff}. Keeping unlocked.")
