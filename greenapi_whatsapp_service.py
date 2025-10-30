@@ -444,13 +444,13 @@ Thanks for reaching out to Business Guru. We appreciate your interest in our fin
 
 We encourage you to revisit our services once your business has been operational for a longer period. If you have any other business financing requirements, please let us know. 
 
-Thank you! 🚀.DataGridViewColumn""",
+Thank you! 🚀""",
             
             'less_than_5_lakhs': """Hii {wati_name} sir/madam! 🙏
 
 We'd like to inform you about our loan policy regarding application amounts. Business Guru provides collateral loans ranging from 5 Lakhs to 5 Crores. Unfortunately, we're unable to process loan applications for amounts less than 5 Lakhs as they fall outside our current lending framework. We recommend consolidating your requirements or considering our services when your financing needs align with our specified range for better financial solutions.
 
-Thank you for your understanding! 💰.DataGridViewColumn""",
+Thank you for your understanding! 💰""",
             
             'first_call_completed': """Hii {wati_name} sir/madam! 📞
 
@@ -712,6 +712,7 @@ Working Hours : 10.00AM - 6.00PM"""
             'start up': 'startup',
             'startup': 'startup',  # Handle both "Start Up" and "Startup"
             'asking less than 5 lakhs': 'less_than_5_lakhs',
+            'asking less than 5 laks': 'less_than_5_lakhs',  # Handle spelling variation
             '1st call completed': 'first_call_completed',
             '2nd call completed': 'second_call_completed',
             '3rd call completed': 'third_call_completed',
