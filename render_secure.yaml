@@ -1,0 +1,78 @@
+services:
+  - type: web
+    name: tmis-business-guru-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start_server.py
+    envVars:
+      # Database Configuration
+      - key: MONGODB_URI
+        sync: false  # Set manually in Render Dashboard
+      
+      # Security Keys
+      - key: JWT_SECRET_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: FLASK_SECRET_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      # Flask Configuration
+      - key: FLASK_ENV
+        value: production
+      
+      - key: UPLOAD_FOLDER
+        value: uploads
+      
+      # Email Configuration (SMTP)
+      - key: SMTP_EMAIL
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: SMTP_PASSWORD
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      
+      - key: SMTP_PORT
+        value: 587
+      
+      # Cloudinary Configuration
+      - key: CLOUDINARY_ENABLED
+        value: true
+      
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: CLOUDINARY_API_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: CLOUDINARY_API_SECRET
+        sync: false  # Set manually in Render Dashboard
+      
+      # Brevo Email Service (Optional)
+      - key: BREVO_API_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: BREVO_FROM_EMAIL
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: BREVO_FROM_NAME
+        value: "TMIS Business Guru"
+      
+      # Green API WhatsApp (Optional)
+      - key: GREENAPI_BASE_URL
+        value: https://api.green-api.com
+      
+      - key: GREENAPI_INSTANCE_ID
+        sync: false  # Set manually in Render Dashboard
+      
+      - key: GREENAPI_TOKEN
+        sync: false  # Set manually in Render Dashboard
+      
+      # Gemini AI (Optional)
+      - key: GEMINI_API_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      # CORS Origins (Optional - add additional origins)
+      - key: ADDITIONAL_CORS_ORIGINS
+        value: ""
