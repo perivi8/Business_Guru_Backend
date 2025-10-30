@@ -2,7 +2,7 @@ services:
   - type: web
     name: tmis-business-guru-backend
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: "./build.sh"
     startCommand: python start_server.py
     envVars:
       - key: MONGODB_URI
