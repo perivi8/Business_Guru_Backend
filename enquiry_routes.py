@@ -564,8 +564,22 @@ def create_enquiry():
         if len(clean_number) != 10:
             return jsonify({'error': 'Please enter a valid 10-digit mobile number'}), 400
         
-        # Check if mobile number already exists
-        existing_enquiry = enquiries_collection.find_one({'mobile_number': clean_number})
+        # Check if mobile number already exists (with or without country code)
+        # Check for both:
+        # 1. Exact match: 9876543210
+        # 2. With country code: 919876543210 (91 + 10 digits)
+        # 3. With other country codes: any digits + last 10 digits match
+        mobile_with_country_code = '91' + clean_number  # Indian country code
+        
+        # Search for mobile number in multiple formats
+        existing_enquiry = enquiries_collection.find_one({
+            '$or': [
+                {'mobile_number': clean_number},  # Exact 10-digit match
+                {'mobile_number': mobile_with_country_code},  # With country code 91
+                {'mobile_number': {'$regex': f'.*{clean_number}$'}}  # Ends with the 10 digits (handles any country code)
+            ]
+        })
+        
         if existing_enquiry:
             return jsonify({
                 'error': 'Mobile number already exists',
@@ -676,8 +690,22 @@ def create_public_enquiry():
         
         logger.info(f"Original phone input: {phone_field} -> Cleaned: {clean_number}")
         
-        # Check if mobile number already exists
-        existing_enquiry = enquiries_collection.find_one({'mobile_number': clean_number})
+        # Check if mobile number already exists (with or without country code)
+        # Check for both:
+        # 1. Exact match: 9876543210
+        # 2. With country code: 919876543210 (91 + 10 digits)
+        # 3. With other country codes: any digits + last 10 digits match
+        mobile_with_country_code = '91' + clean_number  # Indian country code
+        
+        # Search for mobile number in multiple formats
+        existing_enquiry = enquiries_collection.find_one({
+            '$or': [
+                {'mobile_number': clean_number},  # Exact 10-digit match
+                {'mobile_number': mobile_with_country_code},  # With country code 91
+                {'mobile_number': {'$regex': f'.*{clean_number}$'}}  # Ends with the 10 digits (handles any country code)
+            ]
+        })
+        
         if existing_enquiry:
             logger.info(f"Mobile number {clean_number} already exists in database")
             
@@ -1694,6 +1722,31 @@ def update_enquiry(enquiry_id):
             mobile_number = str(data['mobile_number']).strip()
             if not mobile_number.isdigit() or len(mobile_number) < 10 or len(mobile_number) > 15:
                 return jsonify({'error': 'Mobile number must be 10-15 digits (with country code)'}), 400
+            
+            # Check for duplicate mobile number (with or without country code)
+            # Extract last 10 digits for comparison
+            all_digits = ''.join(filter(str.isdigit, mobile_number))
+            clean_number = all_digits[-10:] if len(all_digits) >= 10 else all_digits
+            
+            if len(clean_number) == 10:
+                mobile_with_country_code = '91' + clean_number
+                
+                # Check if this mobile number exists in another enquiry (not the current one)
+                duplicate_enquiry = enquiries_collection.find_one({
+                    '_id': {'$ne': ObjectId(enquiry_id)},  # Exclude current enquiry
+                    '$or': [
+                        {'mobile_number': clean_number},  # Exact 10-digit match
+                        {'mobile_number': mobile_with_country_code},  # With country code 91
+                        {'mobile_number': {'$regex': f'.*{clean_number}$'}}  # Ends with the 10 digits
+                    ]
+                })
+                
+                if duplicate_enquiry:
+                    logger.warning(f"Duplicate mobile number detected during update: {mobile_number}")
+                    return jsonify({
+                        'error': 'Mobile number already exists in another enquiry',
+                        'existing_enquiry_id': str(duplicate_enquiry['_id'])
+                    }), 409
         
         if 'secondary_mobile_number' in data and data['secondary_mobile_number']:
             secondary_mobile = str(data['secondary_mobile_number']).strip()

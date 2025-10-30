@@ -1367,13 +1367,9 @@ def get_client_details(client_id):
             
             client['processed_documents'] = processed_documents
             
-            # Also update the original documents for backward compatibility
-            for doc_type, file_info in client['documents'].items():
-                if isinstance(file_info, dict) and file_info.get('storage_type') == 'cloudinary':
-                    # Replace the complex object with just the URL for simple access
-                    # BUT preserve business_document as full object for proper handling
-                    if doc_type != 'business_document':
-                        client['documents'][doc_type] = file_info['url']
+            # Keep the full document objects in client['documents'] for frontend to access metadata
+            # The frontend will prioritize client['documents'] over client['processed_documents']
+            # No need to simplify to just URLs - keep the full object with original_filename, bytes, etc.
         
         return jsonify({'client': client}), 200
         
@@ -1725,6 +1721,8 @@ def update_client_details(client_id):
                     if deleted_docs and isinstance(deleted_docs, list):
                         # Remove deleted documents from the client's documents
                         current_documents = client.get('documents', {})
+                        current_processed_documents = client.get('processed_documents', {})
+                        
                         for doc_type in deleted_docs:
                             if doc_type in current_documents:
                                 # Delete the physical file if it exists
@@ -1740,8 +1738,14 @@ def update_client_details(client_id):
                                 
                                 # Remove from documents dictionary
                                 del current_documents[doc_type]
+                            
+                            # Also remove from processed_documents to prevent showing old metadata
+                            if doc_type in current_processed_documents:
+                                del current_processed_documents[doc_type]
+                                print(f"Removed {doc_type} from processed_documents")
                         
                         update_data['documents'] = current_documents
+                        update_data['processed_documents'] = current_processed_documents
                         print(f"Processed deleted documents: {deleted_docs}")
                 except json.JSONDecodeError:
                     print("Error parsing deleted_documents JSON")
