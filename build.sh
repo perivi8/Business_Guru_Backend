@@ -7,5 +7,5 @@ apt-get update
 apt-get install -y libmagic1 tesseract-ocr
 
 # Install Python dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
+python3.11 -m pip install --upgrade pip
+python3.11 -m pip install -r requirements.txt
