@@ -295,7 +295,6 @@ Get ₹10 Lakhs in 24 hours for your business:
 
 ✅ New startups welcome
 
-Apply Now: https://business-guru-vert.vercel.app/new-enquiry
 
 ✨ Special Benefits:
 
@@ -305,18 +304,14 @@ Apply Now: https://business-guru-vert.vercel.app/new-enquiry
 
 🏆 Trusted by 2,500+ businesses
 
-📱 Ready to grow?
-Apply Now: https://business-guru-vert.vercel.app/new-enquiry
 
 Your success journey begins now! 🚀
 
-*Please click on any option below:*
+Please click on any option below:
 
-🔗 Get Loan: https://wa.me/918106811285?text=Get%20Loan
-
-🔗 Check Eligibility: https://wa.me/918106811285?text=Check%20Eligibility
-
-🔗 More Details: https://wa.me/918106811285?text=More%20Details""",
+💰 Get Loan
+📋 Check Eligibility
+ℹ️ More Details""",
             
             'new_enquiry_public_form': """Hi {wati_name}👋 Welcome to Business Guru Loans!
 
@@ -340,13 +335,11 @@ Get ₹10 Lakhs in 24 hours for your business:
 
 Your success journey begins now! 🚀
 
-*Please click on any option below:*
+Please click on any option below:
 
-🔗 Get Loan: https://wa.me/918106811285?text=Get%20Loan
-
-🔗 Check Eligibility: https://wa.me/918106811285?text=Check%20Eligibility
-
-🔗 More Details: https://wa.me/918106811285?text=More%20Details""",
+💰 Get Loan
+📋 Check Eligibility
+ℹ️ More Details""",
             
             'no_gst': """Hii {wati_name} sir/madam! 🙏
 
